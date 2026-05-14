@@ -1,8 +1,32 @@
 use anyhow::{Context, Result};
 use auto_dev_pipeline::{log, markdown, test_runner};
-use clap::Parser;
+use clap::{Parser, ValueEnum};
 use std::path::PathBuf;
 use std::process::Command;
+
+/// Available pipeline phases
+#[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]
+enum Phase {
+    /// Run full pipeline: review → aggregate → execute → verify
+    Full,
+    /// Run review phase only
+    Review,
+    /// Run review + aggregate phases
+    Plan,
+    /// Run release phase (create git tag)
+    Release,
+}
+
+impl std::fmt::Display for Phase {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Phase::Full => write!(f, "full"),
+            Phase::Review => write!(f, "review"),
+            Phase::Plan => write!(f, "plan"),
+            Phase::Release => write!(f, "release"),
+        }
+    }
+}
 
 /// Auto-Dev Pipeline Entry Point
 /// Orchestrates: review → aggregate → execute → verify
@@ -13,14 +37,14 @@ struct Args {
     #[arg(default_value = ".")]
     project_path: PathBuf,
 
-    /// Phase to run: full, review, plan
-    #[arg(default_value = "full")]
-    phase: String,
+    /// Phase to run
+    #[arg(value_enum, default_value = "full")]
+    phase: Phase,
 }
 
 struct Pipeline {
     project_path: PathBuf,
-    phase: String,
+    phase: Phase,
     timestamp: String,
     output_dir: PathBuf,
 }
@@ -241,28 +265,25 @@ impl Pipeline {
 
         self.check_prerequisites()?;
 
-        match self.phase.as_str() {
-            "review" => {
+        match self.phase {
+            Phase::Review => {
                 self.run_review_phase()?;
             }
-            "plan" => {
+            Phase::Plan => {
                 let review_dir = self.run_review_phase()?;
                 self.run_aggregate_phase(&review_dir)?;
             }
-            "full" => {
+            Phase::Full => {
                 let review_dir = self.run_review_phase()?;
                 let plan_path = self.run_aggregate_phase(&review_dir)?;
                 self.run_execute_phase(&plan_path)?;
                 self.run_verify_phase()?;
             }
-            "release" => {
+            Phase::Release => {
                 // Release phase — requires version as argument
                 let version = std::env::var("AUTO_DEV_VERSION")
                     .unwrap_or_else(|_| "v0.1.0".to_string());
                 self.run_release_phase(&version)?;
-            }
-            other => {
-                anyhow::bail!("Unknown phase: {}. Use: full, review, plan, release", other);
             }
         }
 
