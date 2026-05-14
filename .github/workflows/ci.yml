@@ -49,23 +49,39 @@ jobs:
       - name: Build release
         run: cargo build --release
 
-  build:
-    name: Build
-    runs-on: ${{ matrix.os }}
+  build-linux:
+    name: Build on ${{ matrix.distro }}
+    runs-on: ubuntu-latest
     strategy:
       matrix:
-        os: [ubuntu-latest, macos-latest]
+        include:
+          - distro: ubuntu
+            image: ubuntu:24.04
+            install: apt-get update && apt-get install -y curl build-essential
+          - distro: fedora
+            image: fedora:40
+            install: dnf install -y curl gcc
+          - distro: alpine
+            image: alpine:3.19
+            install: apk add --no-cache curl build-base
+    container:
+      image: ${{ matrix.image }}
     steps:
-      - uses: actions/checkout@v4
+      - name: Install dependencies
+        run: ${{ matrix.install }}
 
       - name: Install Rust
-        uses: dtolnay/rust-toolchain@stable
+        run: curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+
+      - uses: actions/checkout@v4
 
       - name: Build
-        run: cargo build --release
+        run: |
+          . $HOME/.cargo/env
+          cargo build --release
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: autodev-${{ matrix.os }}
+          name: autodev-${{ matrix.distro }}
           path: target/release/run-pipeline
