@@ -27,6 +27,10 @@ lto = true
 codegen-units = 1
 strip = true
 
+[lib]
+name = "auto_dev_pipeline"
+path = "src/lib.rs"
+
 [[bin]]
 name = "run-pipeline"
 path = "src/bin/run_pipeline.rs"

@@ -1,7 +1,6 @@
 use anyhow::{Context, Result};
+use auto_dev_pipeline::{git, log, test_runner};
 use clap::Parser;
-use colored::Colorize;
-use regex::Regex;
 use std::path::PathBuf;
 use std::process::Command;
 
@@ -24,55 +23,14 @@ impl CiChecker {
         Self { project_path }
     }
 
-    fn log(msg: &str) {
-        println!("{} {}", "[ci-check]".blue(), msg);
-    }
-
-    fn warn(msg: &str) {
-        println!("{} {}", "[ci-check]".yellow(), msg);
-    }
-
-    fn error(msg: &str) {
-        println!("{} {}", "[ci-check]".red(), msg);
-    }
-
-    fn success(msg: &str) {
-        println!("{} {}", "[ci-check]".green(), msg);
-    }
-
-    fn get_repo_info(&self) -> Result<String> {
-        let output = Command::new("git")
-            .args(["remote", "get-url", "origin"])
-            .current_dir(&self.project_path)
-            .output()
-            .context("Failed to get git remote")?;
-
-        if !output.status.success() {
-            anyhow::bail!("No git remote 'origin' found");
-        }
-
-        let remote_url = String::from_utf8_lossy(&output.stdout).trim().to_string();
-
-        // Parse GitHub URL
-        // Group 1: owner, Group 2: repo name (optional .git suffix)
-        let re = Regex::new(r"github\.com[:/]([^/]+)/([^/]+?)(?:\.git)?$")?;
-        if let Some(caps) = re.captures(&remote_url) {
-            let owner = &caps[1];
-            let repo = &caps[2];
-            Ok(format!("{}/{}", owner, repo))
-        } else {
-            anyhow::bail!("Not a GitHub repository: {}", remote_url)
-        }
-    }
-
     fn check_ci_status(&self, repo: &str) -> Result<bool> {
         let token = std::env::var("GITHUB_PAT").ok();
 
         if token.is_none() {
-            Self::warn("GITHUB_PAT not set, trying without auth (public repos only)");
+            log::warn("GITHUB_PAT not set, trying without auth (public repos only)");
         }
 
-        Self::log(&format!("Checking CI status for: {}", repo));
+        log::log(&format!("Checking CI status for: {}", repo));
 
         let api_url = format!(
             "https://api.github.com/repos/{}/actions/runs?per_page=5",
@@ -98,10 +56,10 @@ impl CiChecker {
                 .get("message")
                 .and_then(|v| v.as_str())
                 .unwrap_or("Unknown error");
-            Self::warn(&format!("GitHub API error ({}): {}", status, msg));
+            log::warn(&format!("GitHub API error ({}): {}", status, msg));
 
             if status.as_u16() == 403 {
-                Self::warn("Rate limit exceeded. Set GITHUB_PAT for higher limits.");
+                log::warn("Rate limit exceeded. Set GITHUB_PAT for higher limits.");
             }
             return Ok(false);
         }
@@ -114,11 +72,11 @@ impl CiChecker {
             .unwrap_or(0);
 
         if total_count == 0 {
-            Self::warn("No CI workflows found");
+            log::warn("No CI workflows found");
             return Ok(false);
         }
 
-        Self::log(&format!("Found {} recent workflow runs", total_count));
+        log::log(&format!("Found {} recent workflow runs", total_count));
 
         let runs = data
             .get("workflow_runs")
@@ -150,16 +108,16 @@ impl CiChecker {
         }
 
         if !all_passed {
-            Self::error("Some recent workflow runs failed!");
+            log::error("Some recent workflow runs failed!");
             return Ok(false);
         }
 
-        Self::success("All recent CI runs passed");
+        log::success("All recent CI runs passed");
         Ok(true)
     }
 
     fn check_local_tests(&self) -> Result<()> {
-        Self::log("Checking local test status...");
+        log::log("Checking local test status...");
 
         if self.project_path.join("Makefile").exists() {
             let output = Command::new("make")
@@ -167,9 +125,9 @@ impl CiChecker {
                 .current_dir(&self.project_path)
                 .output()?;
             if output.status.success() {
-                Self::success("Local tests passed (make test)");
+                log::success("Local tests passed (make test)");
             } else {
-                Self::warn("Local tests failed (make test)");
+                log::warn("Local tests failed (make test)");
             }
         } else if self.project_path.join("package.json").exists() {
             let output = Command::new("npm")
@@ -177,9 +135,9 @@ impl CiChecker {
                 .current_dir(&self.project_path)
                 .output()?;
             if output.status.success() {
-                Self::success("Local tests passed (npm test)");
+                log::success("Local tests passed (npm test)");
             } else {
-                Self::warn("Local tests failed (npm test)");
+                log::warn("Local tests failed (npm test)");
             }
         } else if self.project_path.join("pyproject.toml").exists()
             || self.project_path.join("setup.py").exists()
@@ -188,9 +146,9 @@ impl CiChecker {
                 .current_dir(&self.project_path)
                 .output()?;
             if output.status.success() {
-                Self::success("Local tests passed (pytest)");
+                log::success("Local tests passed (pytest)");
             } else {
-                Self::warn("Local tests failed (pytest)");
+                log::warn("Local tests failed (pytest)");
             }
         }
 
@@ -198,26 +156,26 @@ impl CiChecker {
     }
 
     fn run(&self) -> Result<()> {
-        Self::log("CI Status Checker v1.0.0 (Rust)");
-        Self::log(&format!("Project: {}", self.project_path.display()));
+        log::log("CI Status Checker v1.0.0 (Rust)");
+        log::log(&format!("Project: {}", self.project_path.display()));
 
         // Get repo info
-        match self.get_repo_info() {
+        match git::get_repo_info(&self.project_path) {
             Ok(repo) => {
-                Self::log(&format!("Repository: {}", repo));
+                log::log(&format!("Repository: {}", repo));
 
                 if let Err(e) = self.check_ci_status(&repo) {
-                    Self::warn(&format!("CI check failed: {}", e));
+                    log::warn(&format!("CI check failed: {}", e));
                 }
             }
             Err(e) => {
-                Self::warn(&format!("Could not determine GitHub repo: {}", e}));
+                log::warn(&format!("Could not determine GitHub repo: {}", e));
             }
         }
 
         self.check_local_tests()?;
 
-        Self::success("All checks complete!");
+        log::success("All checks complete!");
         Ok(())
     }
 }

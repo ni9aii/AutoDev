@@ -1,6 +1,6 @@
 use anyhow::{Context, Result};
+use auto_dev_pipeline::{log, markdown, test_runner};
 use clap::Parser;
-use colored::Colorize;
 use std::path::PathBuf;
 use std::process::Command;
 
@@ -42,24 +42,12 @@ impl Pipeline {
         })
     }
 
-    fn log(msg: &str) {
-        println!("{} {}", "[auto-dev]".blue(), msg);
-    }
 
-    fn warn(msg: &str) {
-        println!("{} {}", "[auto-dev]".yellow(), msg);
-    }
 
-    fn error(msg: &str) {
-        println!("{} {}", "[auto-dev]".red(), msg);
-    }
 
-    fn success(msg: &str) {
-        println!("{} {}", "[auto-dev]".green(), msg);
-    }
 
     fn check_prerequisites(&self) -> Result<()> {
-        Self::log("Checking prerequisites...");
+        log::log("Checking prerequisites...");
 
         // Check git repo
         let git_dir = self.project_path.join(".git");
@@ -69,36 +57,36 @@ impl Pipeline {
 
         // Check Claude Code CLI
         match Command::new("claude").arg("--version").output() {
-            Ok(_) => Self::log("Claude Code CLI: found"),
+            Ok(_) => log::log("Claude Code CLI: found"),
             Err(_) => {
-                Self::warn("Claude Code CLI not found. Install: npm install -g @anthropic-ai/claude-code");
-                Self::warn("Falling back to manual execution mode.");
+                log::warn("Claude Code CLI not found. Install: npm install -g @anthropic-ai/claude-code");
+                log::warn("Falling back to manual execution mode.");
             }
         }
 
-        Self::success("Prerequisites OK");
+        log::success("Prerequisites OK");
         Ok(())
     }
 
     fn run_review_phase(&self) -> Result<PathBuf> {
-        Self::log("=== PHASE 1: REVIEW ===");
-        Self::log("Launching 4 reviewers in parallel...");
+        log::log("=== PHASE 1: REVIEW ===");
+        log::log("Launching 4 reviewers in parallel...");
 
         let review_dir = self.output_dir.join(format!("{}-reviews", self.timestamp));
         std::fs::create_dir_all(&review_dir)?;
 
-        Self::log("1. Code Reviewer");
-        Self::log("2. Security Reviewer");
-        Self::log("3. Architecture Reviewer");
-        Self::log("4. DevOps Reviewer");
-        Self::log("(Reviewers are dispatched as Hermes subagents)");
+        log::log("1. Code Reviewer");
+        log::log("2. Security Reviewer");
+        log::log("3. Architecture Reviewer");
+        log::log("4. DevOps Reviewer");
+        log::log("(Reviewers are dispatched as Hermes subagents)");
 
-        Self::success(&format!("Review phase complete. Reports in: {}", review_dir.display()));
+        log::success(&format!("Review phase complete. Reports in: {}", review_dir.display()));
         Ok(review_dir)
     }
 
     fn run_aggregate_phase(&self, review_dir: &PathBuf) -> Result<PathBuf> {
-        Self::log("=== PHASE 2: AGGREGATE ===");
+        log::log("=== PHASE 2: AGGREGATE ===");
 
         let plan_path = self.output_dir.join(format!("{}-plan.md", self.timestamp));
 
@@ -111,38 +99,38 @@ impl Pipeline {
             .context("Failed to run review-aggregator")?;
 
         if !output.status.success() {
-            Self::warn(&format!(
+            log::warn(&format!(
                 "review-aggregator exited with code: {:?}",
                 output.status.code()
             ));
             let stderr = String::from_utf8_lossy(&output.stderr);
             if !stderr.is_empty() {
-                Self::warn(&stderr);
+                log::warn(&stderr);
             }
         }
 
         let stdout = String::from_utf8_lossy(&output.stdout);
         print!("{}", stdout);
 
-        Self::success(&format!("Aggregation complete. Plan: {}", plan_path.display()));
+        log::success(&format!("Aggregation complete. Plan: {}", plan_path.display()));
         Ok(plan_path)
     }
 
     fn run_execute_phase(&self, plan_path: &PathBuf) -> Result<()> {
-        Self::log("=== PHASE 3: EXECUTE ===");
+        log::log("=== PHASE 3: EXECUTE ===");
 
         // Read plan and execute each fix
         let plan_content = std::fs::read_to_string(plan_path)
             .context("Failed to read plan file")?;
 
         // Extract Do Now fixes from plan
-        let do_now_section = extract_section(&plan_content, "Do Now");
+        let do_now_section = markdown::extract_section(&plan_content, "Do Now");
         if !do_now_section.is_empty() {
-            Self::log("Executing Do Now fixes via Claude Code...");
+            log::log("Executing Do Now fixes via Claude Code...");
             self.execute_via_claude(&do_now_section)?;
         }
 
-        Self::success("Execution complete");
+        log::success("Execution complete");
         Ok(())
     }
 
@@ -161,7 +149,7 @@ impl Pipeline {
             .context("Failed to run Claude Code")?;
 
         if !output.status.success() {
-            Self::warn("Claude Code exited with non-zero status");
+            log::warn("Claude Code exited with non-zero status");
         }
 
         let stdout = String::from_utf8_lossy(&output.stdout);
@@ -171,10 +159,10 @@ impl Pipeline {
     }
 
     fn run_release_phase(&self, version: &str) -> Result<()> {
-        Self::log("=== PHASE 5: RELEASE ===");
+        log::log("=== PHASE 5: RELEASE ===");
 
         // Create git tag
-        Self::log(&format!("Creating tag: {}", version));
+        log::log(&format!("Creating tag: {}", version));
         let tag_output = Command::new("git")
             .args(["tag", "-a", version, "-m", &format!("Release {}", version)])
             .current_dir(&self.project_path)
@@ -182,11 +170,11 @@ impl Pipeline {
             .context("Failed to create git tag")?;
 
         if !tag_output.status.success() {
-            Self::warn("Failed to create tag");
+            log::warn("Failed to create tag");
         }
 
         // Push tag
-        Self::log("Pushing tag...");
+        log::log("Pushing tag...");
         let push_output = Command::new("git")
             .args(["push", "origin", version])
             .current_dir(&self.project_path)
@@ -194,73 +182,51 @@ impl Pipeline {
             .context("Failed to push tag")?;
 
         if !push_output.status.success() {
-            Self::warn("Failed to push tag");
+            log::warn("Failed to push tag");
         }
 
-        Self::success(&format!("Release {} created", version));
+        log::success(&format!("Release {} created", version));
         Ok(())
     }
 
     fn run_verify_phase(&self) -> Result<()> {
-        Self::log("=== PHASE 4: VERIFY ===");
+        log::log("=== PHASE 4: VERIFY ===");
 
         // Run local tests
         self.run_local_tests()?;
 
         // Check CI status
-        Self::log("Checking CI status...");
+        log::log("Checking CI status...");
         let ci_output = Command::new("ci-check")
             .arg(&self.project_path)
             .output()
             .context("Failed to run ci-check")?;
 
         if !ci_output.status.success() {
-            Self::warn("CI check found issues");
+            log::warn("CI check found issues");
         }
 
         let stdout = String::from_utf8_lossy(&ci_output.stdout);
         print!("{}", stdout);
 
-        Self::success("Verification complete");
+        log::success("Verification complete");
         Ok(())
     }
 
     fn run_local_tests(&self) -> Result<()> {
-        Self::log("Checking local test status...");
+        log::log("Checking local test status...");
 
-        if self.project_path.join("Makefile").exists() {
-            Self::log("Running: make test");
-            let output = Command::new("make")
-                .arg("test")
-                .current_dir(&self.project_path)
-                .output()?;
-            if output.status.success() {
-                Self::success("Local tests passed");
-            } else {
-                Self::warn("Local tests failed");
+        match test_runner::run_local_tests(&self.project_path) {
+            Ok(result) => {
+                log::log(&format!("Running: {}", result.runner.name()));
+                if result.success {
+                    log::success("Local tests passed");
+                } else {
+                    log::warn("Local tests failed");
+                }
             }
-        } else if self.project_path.join("package.json").exists() {
-            Self::log("Running: npm test");
-            let output = Command::new("npm")
-                .arg("test")
-                .current_dir(&self.project_path)
-                .output()?;
-            if output.status.success() {
-                Self::success("Local tests passed");
-            } else {
-                Self::warn("Local tests failed");
-            }
-        } else if self.project_path.join("pyproject.toml").exists()
-            || self.project_path.join("setup.py").exists()
-        {
-            Self::log("Running: pytest");
-            let output = Command::new("pytest")
-                .current_dir(&self.project_path)
-                .output()?;
-            if output.status.success() {
-                Self::success("Local tests passed");
-            } else {
-                Self::warn("Local tests failed");
+            Err(e) => {
+                log::warn(&format!("No test runner found: {}", e));
             }
         }
 
@@ -268,10 +234,10 @@ impl Pipeline {
     }
 
     fn run(&self) -> Result<()> {
-        Self::log("Auto-Dev Pipeline v1.0.0 (Rust)");
-        Self::log(&format!("Project: {}", self.project_path.display()));
-        Self::log(&format!("Phase: {}", self.phase));
-        Self::log(&format!("Output: {}", self.output_dir.display()));
+        log::log("Auto-Dev Pipeline v1.0.0 (Rust)");
+        log::log(&format!("Project: {}", self.project_path.display()));
+        log::log(&format!("Phase: {}", self.phase));
+        log::log(&format!("Output: {}", self.output_dir.display()));
 
         self.check_prerequisites()?;
 
@@ -300,40 +266,10 @@ impl Pipeline {
             }
         }
 
-        Self::success("Pipeline complete!");
-        Self::log(&format!("Reports: {}", self.output_dir.display()));
+        log::success("Pipeline complete!");
+        log::log(&format!("Reports: {}", self.output_dir.display()));
         Ok(())
     }
-}
-
-/// Extract a section from markdown by heading name
-fn extract_section(content: &str, section_name: &str) -> String {
-    let lines: Vec<&str> = content.lines().collect();
-    let mut result = Vec::new();
-    let mut in_section = false;
-
-    for line in &lines {
-        let trimmed = line.trim();
-        
-        // Check if this is a heading
-        if trimmed.starts_with("## ") {
-            let heading = trimmed.trim_start_matches("## ").trim();
-            if heading.contains(section_name) {
-                in_section = true;
-                result.push(line.to_string());
-                continue;
-            } else if in_section {
-                // Hit next section at same or higher level
-                break;
-            }
-        }
-        
-        if in_section {
-            result.push(line.to_string());
-        }
-    }
-
-    result.join("\n")
 }
 
 fn main() -> Result<()> {
