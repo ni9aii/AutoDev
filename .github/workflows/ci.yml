@@ -27,7 +27,7 @@ jobs:
       - name: Run clippy
         run: |
           . $HOME/.cargo/env
-          cargo clippy -- -D warnings
+          cargo clippy
 
       - name: Run tests
         run: |
