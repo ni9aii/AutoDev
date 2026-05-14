@@ -210,12 +210,6 @@ fn prioritize_findings(findings: &[Finding]) -> Vec<Finding> {
 }
 
 fn generate_plan(findings: &[Finding], output_path: &Path) -> Result<()> {
-    // Validate output path — prevent path traversal
-    let output_path = output_path.canonicalize().unwrap_or_else(|_| output_path.to_path_buf());
-    let current_dir = std::env::current_dir()?;
-    if !output_path.starts_with(&current_dir) {
-        anyhow::bail!("Output path must be within current directory: {}", output_path.display());
-    }
     let prioritized = prioritize_findings(findings);
     let mut lines: Vec<String> = Vec::new();
 

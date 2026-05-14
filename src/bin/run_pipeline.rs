@@ -367,11 +367,14 @@ impl Pipeline {
             version, version
         );
 
+        let token = std::env::var("GITHUB_TOKEN")
+            .or_else(|_| std::env::var("GITHUB_PAT"))
+            .context("GITHUB_TOKEN or GITHUB_PAT must be set")?;
         let release_output = Command::new("curl")
             .args([
                 "-s", "-X", "POST",
                 "-H", "Accept: application/vnd.github+json",
-                "-H", &format!("Authorization: Bearer {}", std::env::var("GITHUB_TOKEN").unwrap_or_default()),
+                "-H", &format!("Authorization: Bearer {}", token),
                 "-d", &release_json,
                 &format!("https://api.github.com/repos/{}/releases", repo),
             ])
