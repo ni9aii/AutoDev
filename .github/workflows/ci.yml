@@ -64,6 +64,9 @@ jobs:
           - distro: alpine
             image: alpine:3.19
             install: apk add --no-cache curl build-base
+          - distro: arch
+            image: archlinux:latest
+            install: pacman -Sy --noconfirm curl base-devel
     container:
       image: ${{ matrix.image }}
     steps:
