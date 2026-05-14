@@ -65,7 +65,7 @@ fn parse_review_file(filepath: &Path) -> Result<Vec<Finding>> {
     )?;
 
     // Pattern 2: Table row | CRITICAL | Title | ... |
-    let table_re = Regex::new(r"(?im)\|\s*(CRITICAL|IMPORTANT|MINOR)\s*\|\s*(.+?)\s*\|")?;
+    let table_re = Regex::new(r"(?im)\|\s*(CRITICAL|IMPORTANT|MINOR)\s*\|\s*([^|]+?)\s*\|")?;
 
     // Pattern 3: Bullet list - [CRITICAL] Title
     let bullet_re = Regex::new(r"(?im)^\s*[-*]\s*\[(CRITICAL|IMPORTANT|MINOR)\]\s*(.+)$")?;
@@ -175,6 +175,12 @@ fn prioritize_findings(findings: &[Finding]) -> Vec<Finding> {
 }
 
 fn generate_plan(findings: &[Finding], output_path: &Path) -> Result<()> {
+    // Validate output path — prevent path traversal
+    let output_path = output_path.canonicalize().unwrap_or_else(|_| output_path.to_path_buf());
+    let current_dir = std::env::current_dir()?;
+    if !output_path.starts_with(&current_dir) {
+        anyhow::bail!("Output path must be within current directory: {}", output_path.display());
+    }
     let prioritized = prioritize_findings(findings);
     let mut lines: Vec<String> = Vec::new();
 
