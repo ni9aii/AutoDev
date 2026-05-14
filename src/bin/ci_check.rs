@@ -127,7 +127,8 @@ impl CiChecker {
             if output.status.success() {
                 log::success("Local tests passed (make test)");
             } else {
-                log::warn("Local tests failed (make test)");
+                let stderr = String::from_utf8_lossy(&output.stderr);
+                anyhow::bail!("Local tests failed (make test): {}", stderr);
             }
         } else if self.project_path.join("package.json").exists() {
             let output = Command::new("npm")
@@ -137,7 +138,8 @@ impl CiChecker {
             if output.status.success() {
                 log::success("Local tests passed (npm test)");
             } else {
-                log::warn("Local tests failed (npm test)");
+                let stderr = String::from_utf8_lossy(&output.stderr);
+                anyhow::bail!("Local tests failed (npm test): {}", stderr);
             }
         } else if self.project_path.join("pyproject.toml").exists()
             || self.project_path.join("setup.py").exists()
@@ -148,7 +150,8 @@ impl CiChecker {
             if output.status.success() {
                 log::success("Local tests passed (pytest)");
             } else {
-                log::warn("Local tests failed (pytest)");
+                let stderr = String::from_utf8_lossy(&output.stderr);
+                anyhow::bail!("Local tests failed (pytest): {}", stderr);
             }
         }
 
