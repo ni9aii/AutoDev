@@ -1,5 +1,5 @@
 use anyhow::{Context, Result};
-use auto_dev_pipeline::{git, log, test_runner};
+use auto_dev_pipeline::{git, log};
 use clap::Parser;
 use std::path::PathBuf;
 use std::process::Command;
