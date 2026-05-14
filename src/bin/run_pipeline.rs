@@ -252,8 +252,8 @@ impl Pipeline {
                 }
                 let title = trimmed
                     .trim_start_matches("### Fix ")
-                    .splitn(2, ':')
-                    .nth(1)
+                    .split_once(':')
+                    .map(|x| x.1)
                     .unwrap_or("Unknown")
                     .trim()
                     .to_string();
