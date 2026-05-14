@@ -363,7 +363,7 @@ impl Pipeline {
         log::log("Creating GitHub Release...");
         let repo = auto_dev_pipeline::git::get_repo_info(&self.project_path)?;
         let release_json = format!(
-            '{{"tag_name":"{}","name":"Release {}","body":"Auto-generated release","draft":false,"prerelease":false}}',
+            "{{\"tag_name\":\"{}\",\"name\":\"Release {}\",\"body\":\"Auto-generated release\",\"draft\":false,\"prerelease\":false}}",
             version, version
         );
 

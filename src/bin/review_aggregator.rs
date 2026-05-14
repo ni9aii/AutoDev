@@ -1,4 +1,4 @@
-use anyhow::{Context, Result};
+use anyhow::Result;
 use clap::Parser;
 use once_cell::sync::Lazy;
 use regex::Regex;
@@ -89,17 +89,6 @@ fn parse_review_file(filepath: &Path) -> Result<Vec<Finding>> {
         .unwrap_or("unknown")
         .to_string();
 
-    // Pattern 1: Markdown header ### [CRITICAL] Title
-    let header_re = Regex::new(
-        r"(?im)###\s*\[(CRITICAL|IMPORTANT|MINOR)\]\s*(.+?)\n(.*?)(?=\n#{1,3}\s|\z)",
-    )?;
-
-    // Pattern 2: Table row | CRITICAL | Title | ... |
-    let table_re = Regex::new(r"(?im)\|\s*(CRITICAL|IMPORTANT|MINOR)\s*\|\s*([^|]+?)\s*\|")?;
-
-    // Pattern 3: Bullet list - [CRITICAL] Title
-    let bullet_re = Regex::new(r"(?im)^\s*[-*]\s*\[(CRITICAL|IMPORTANT|MINOR)\]\s*(.+)$")?;
-
     // Collect matches from all patterns
     let mut matches: Vec<(String, String, String)> = Vec::new();
 
@@ -139,16 +128,20 @@ fn parse_review_file(filepath: &Path) -> Result<Vec<Finding>> {
             .captures(&body)
             .and_then(|cap| cap[1].parse::<usize>().ok());
 
+        let classification = classify_finding(&severity, &file, &body);
+        let files_affected = count_files(&body);
+        let estimated_effort = estimate_effort(&severity, &file, &body);
+
         findings.push(Finding {
             role: role.clone(),
             severity,
             title,
             description: body,
-            file: file.clone(),
+            file,
             line,
-            classification: classify_finding(&severity, &file, &body),
-            files_affected: count_files(&body),
-            estimated_effort: estimate_effort(&severity, &file, &body),
+            classification,
+            files_affected,
+            estimated_effort,
         });
     }
 
@@ -175,7 +168,7 @@ fn count_files(body: &str) -> usize {
     CODE_FILE_RE.find_iter(body).count().max(1)
 }
 
-fn estimate_effort(severity: &str, file: &Option<String>, body: &str) -> String {
+fn estimate_effort(severity: &str, _file: &Option<String>, body: &str) -> String {
     let body_lower = body.to_lowercase();
     if body_lower.contains("refactor") || body_lower.contains("architecture") || body_lower.contains("redesign") {
         "high".to_string()
