@@ -1,11 +1,41 @@
 use anyhow::{Context, Result};
 use clap::Parser;
+use once_cell::sync::Lazy;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
 use walkdir::WalkDir;
+
+// Pre-compiled regex patterns (compiled once, used many times)
+static HEADER_RE: Lazy<Regex> = Lazy::new(|| {
+    Regex::new(r"(?im)###\s*\[(CRITICAL|IMPORTANT|MINOR)\]\s*(.+?)\n(.*?)(?=\n#{1,3}\s|\z)")
+        .expect("Invalid HEADER_RE pattern")
+});
+
+static TABLE_RE: Lazy<Regex> = Lazy::new(|| {
+    Regex::new(r"(?im)\|\s*(CRITICAL|IMPORTANT|MINOR)\s*\|\s*([^|]+?)\s*\|")
+        .expect("Invalid TABLE_RE pattern")
+});
+
+static BULLET_RE: Lazy<Regex> = Lazy::new(|| {
+    Regex::new(r"(?im)^\s*[-*]\s*\[(CRITICAL|IMPORTANT|MINOR)\]\s*(.+)$")
+        .expect("Invalid BULLET_RE pattern")
+});
+
+static FILE_RE: Lazy<Regex> = Lazy::new(|| {
+    Regex::new(r"(?i)[Ff]ile:\s*`?([^`\n]+)`?").expect("Invalid FILE_RE pattern")
+});
+
+static LINE_RE: Lazy<Regex> = Lazy::new(|| {
+    Regex::new(r"(?i)[Ll]ine:\s*(\d+)").expect("Invalid LINE_RE pattern")
+});
+
+static CODE_FILE_RE: Lazy<Regex> = Lazy::new(|| {
+    Regex::new(r"`[^`]+\.(c|h|cpp|hpp|py|rs|toml|yaml|yml|json|md)`")
+        .expect("Invalid CODE_FILE_RE pattern")
+});
 
 /// Review Aggregator for Auto-Dev Pipeline
 /// Aggregates findings from reviewers and generates prioritized fix plan
@@ -73,20 +103,20 @@ fn parse_review_file(filepath: &Path) -> Result<Vec<Finding>> {
     // Collect matches from all patterns
     let mut matches: Vec<(String, String, String)> = Vec::new();
 
-    for cap in header_re.captures_iter(&content) {
+    for cap in HEADER_RE.captures_iter(&content) {
         let severity = cap[1].to_uppercase();
         let title = cap[2].trim().to_string();
         let body = cap[3].trim().to_string();
         matches.push((severity, title, body));
     }
 
-    for cap in table_re.captures_iter(&content) {
+    for cap in TABLE_RE.captures_iter(&content) {
         let severity = cap[1].to_uppercase();
         let title = cap[2].trim().to_string();
         matches.push((severity, title, String::new()));
     }
 
-    for cap in bullet_re.captures_iter(&content) {
+    for cap in BULLET_RE.captures_iter(&content) {
         let severity = cap[1].to_uppercase();
         let title = cap[2].trim().to_string();
         matches.push((severity, title, String::new()));
@@ -100,17 +130,13 @@ fn parse_review_file(filepath: &Path) -> Result<Vec<Finding>> {
         }
 
         // Extract file path
-        let file_re = Regex::new(r"(?i)[Ff]ile:\s*`?([^`\n]+)`?").ok();
-        let file = file_re
-            .as_ref()
-            .and_then(|re| re.captures(&body))
+        let file = FILE_RE
+            .captures(&body)
             .map(|cap| cap[1].trim().to_string());
 
         // Extract line number
-        let line_re = Regex::new(r"(?i)[Ll]ine:\s*(\d+)").ok();
-        let line = line_re
-            .as_ref()
-            .and_then(|re| re.captures(&body))
+        let line = LINE_RE
+            .captures(&body)
             .and_then(|cap| cap[1].parse::<usize>().ok());
 
         findings.push(Finding {
@@ -146,8 +172,7 @@ fn classify_finding(severity: &str, file: &Option<String>, body: &str) -> String
 }
 
 fn count_files(body: &str) -> usize {
-    let re = Regex::new(r"`[^`]+\.(c|h|cpp|hpp|py|rs|toml|yaml|yml|json|md)`").unwrap();
-    re.find_iter(body).count().max(1)
+    CODE_FILE_RE.find_iter(body).count().max(1)
 }
 
 fn estimate_effort(severity: &str, file: &Option<String>, body: &str) -> String {
