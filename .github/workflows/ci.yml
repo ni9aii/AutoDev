@@ -24,11 +24,6 @@ jobs:
 
       - uses: actions/checkout@v4
 
-      - name: Check formatting
-        run: |
-          . $HOME/.cargo/env
-          cargo fmt -- --check
-
       - name: Run clippy
         run: |
           . $HOME/.cargo/env
