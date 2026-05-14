@@ -49,29 +49,14 @@ jobs:
       - name: Build release
         run: cargo build --release
 
-  build-linux:
-    name: Build on ${{ matrix.distro }}
+  build-arch:
+    name: Build on Arch Linux
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        include:
-          - distro: ubuntu
-            image: ubuntu:24.04
-            install: apt-get update && apt-get install -y curl build-essential
-          - distro: fedora
-            image: fedora:40
-            install: dnf install -y curl gcc
-          - distro: alpine
-            image: alpine:3.19
-            install: apk add --no-cache curl build-base
-          - distro: arch
-            image: archlinux:latest
-            install: pacman -Sy --noconfirm curl base-devel
     container:
-      image: ${{ matrix.image }}
+      image: archlinux:latest
     steps:
       - name: Install dependencies
-        run: ${{ matrix.install }}
+        run: pacman -Sy --noconfirm curl base-devel
 
       - name: Install Rust
         run: curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
@@ -86,5 +71,5 @@ jobs:
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: autodev-${{ matrix.distro }}
+          name: autodev-arch
           path: target/release/run-pipeline
