@@ -54,11 +54,11 @@ impl CiChecker {
         let remote_url = String::from_utf8_lossy(&output.stdout).trim().to_string();
 
         // Parse GitHub URL
-        let re = Regex::new(r"github\.com[:/]([^/]+)/[^/]+?(\.git)?$")?;
+        // Group 1: owner, Group 2: repo name (optional .git suffix)
+        let re = Regex::new(r"github\.com[:/]([^/]+)/([^/]+?)(?:\.git)?$")?;
         if let Some(caps) = re.captures(&remote_url) {
             let owner = &caps[1];
             let repo = &caps[2];
-            let repo = repo.trim_end_matches(".git");
             Ok(format!("{}/{}", owner, repo))
         } else {
             anyhow::bail!("Not a GitHub repository: {}", remote_url)

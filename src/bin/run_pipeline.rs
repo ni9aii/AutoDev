@@ -73,7 +73,6 @@ impl Pipeline {
             Err(_) => {
                 Self::warn("Claude Code CLI not found. Install: npm install -g @anthropic-ai/claude-code");
                 Self::warn("Falling back to manual execution mode.");
-                std::env::set_var("AUTO_DEV_MANUAL", "1");
             }
         }
 
@@ -156,7 +155,6 @@ impl Pipeline {
                 "Read,Edit,Bash",
                 "--max-turns",
                 "15",
-                "--dangerously-skip-permissions",
             ])
             .current_dir(&self.project_path)
             .output()
@@ -270,7 +268,7 @@ impl Pipeline {
     }
 
     fn run(&self) -> Result<()> {
-        Self::log("Auto-Dev Pipeline v2.0.0 (Rust)");
+        Self::log("Auto-Dev Pipeline v1.0.0 (Rust)");
         Self::log(&format!("Project: {}", self.project_path.display()));
         Self::log(&format!("Phase: {}", self.phase));
         Self::log(&format!("Output: {}", self.output_dir.display()));
@@ -313,7 +311,6 @@ fn extract_section(content: &str, section_name: &str) -> String {
     let lines: Vec<&str> = content.lines().collect();
     let mut result = Vec::new();
     let mut in_section = false;
-    let mut section_level = 0;
 
     for line in &lines {
         let trimmed = line.trim();
@@ -323,7 +320,6 @@ fn extract_section(content: &str, section_name: &str) -> String {
             let heading = trimmed.trim_start_matches("## ").trim();
             if heading.contains(section_name) {
                 in_section = true;
-                section_level = 2;
                 result.push(line.to_string());
                 continue;
             } else if in_section {
