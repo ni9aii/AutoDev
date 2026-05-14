@@ -10,7 +10,7 @@ use walkdir::WalkDir;
 
 // Pre-compiled regex patterns (compiled once, used many times)
 static HEADER_RE: Lazy<Regex> = Lazy::new(|| {
-    Regex::new(r"(?im)###\s*\[(CRITICAL|IMPORTANT|MINOR)\]\s*(.+?)\n(.*?)(?=\n#{1,3}\s|\z)")
+    Regex::new(r"(?im)^###\s*\[(CRITICAL|IMPORTANT|MINOR)\]\s*(.+?)$")
         .expect("Invalid HEADER_RE pattern")
 });
 
@@ -89,14 +89,31 @@ fn parse_review_file(filepath: &Path) -> Result<Vec<Finding>> {
         .unwrap_or("unknown")
         .to_string();
 
-    // Collect matches from all patterns
+    // Parse headers with body manually (Rust regex doesn't support look-ahead)
     let mut matches: Vec<(String, String, String)> = Vec::new();
-
-    for cap in HEADER_RE.captures_iter(&content) {
-        let severity = cap[1].to_uppercase();
-        let title = cap[2].trim().to_string();
-        let body = cap[3].trim().to_string();
-        matches.push((severity, title, body));
+    let lines: Vec<&str> = content.lines().collect();
+    let mut i = 0;
+    while i < lines.len() {
+        let line = lines[i];
+        if let Some(cap) = HEADER_RE.captures(line) {
+            let severity = cap[1].to_uppercase();
+            let title = cap[2].trim().to_string();
+            // Collect body until next header or end
+            let mut body_lines = Vec::new();
+            i += 1;
+            while i < lines.len() {
+                let next = lines[i];
+                if next.starts_with("### ") || next.starts_with("## ") || next.starts_with("# ") {
+                    break;
+                }
+                body_lines.push(next);
+                i += 1;
+            }
+            let body = body_lines.join("\n").trim().to_string();
+            matches.push((severity, title, body));
+            continue;
+        }
+        i += 1;
     }
 
     for cap in TABLE_RE.captures_iter(&content) {
@@ -305,7 +322,7 @@ fn main() -> Result<()> {
     for entry in WalkDir::new(&args.input_dir)
         .into_iter()
         .filter_map(|e| e.ok())
-        .filter(|e| e.path().extension().map_or(false, |ext| ext == "md"))
+        .filter(|e| e.path().extension().is_some_and(|ext| ext == "md"))
     {
         let findings = parse_review_file(entry.path())?;
         eprintln!(
