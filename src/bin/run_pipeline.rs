@@ -49,6 +49,14 @@ struct Pipeline {
     output_dir: PathBuf,
 }
 
+/// Individual fix parsed from Do Now section
+struct Fix {
+    title: String,
+    severity: String,
+    file: Option<String>,
+    description: String,
+}
+
 impl Pipeline {
     fn new(args: Args) -> Result<Self> {
         let timestamp = chrono::Local::now().format("%Y%m%d_%H%M%S").to_string();
@@ -94,16 +102,60 @@ impl Pipeline {
 
     fn run_review_phase(&self) -> Result<PathBuf> {
         log::log("=== PHASE 1: REVIEW ===");
-        log::log("Launching 4 reviewers in parallel...");
+        log::log("Launching 4 reviewers via Claude Code...");
 
         let review_dir = self.output_dir.join(format!("{}-reviews", self.timestamp));
         std::fs::create_dir_all(&review_dir)?;
 
-        log::log("1. Code Reviewer");
-        log::log("2. Security Reviewer");
-        log::log("3. Architecture Reviewer");
-        log::log("4. DevOps Reviewer");
-        log::log("(Reviewers are dispatched as Hermes subagents)");
+        let reviewers = [
+            ("code", "Code Reviewer: check logic, style, idioms, performance"),
+            ("security", "Security Reviewer: check vulnerabilities, unsafe code, secrets"),
+            ("architecture", "Architecture Reviewer: check structure, coupling, patterns"),
+            ("devops", "DevOps Reviewer: check CI/CD, dependencies, build, deploy"),
+        ];
+
+        for (name, prompt) in &reviewers {
+            log::log(&format!("Starting {} review...", name));
+            
+            let review_prompt = format!(
+                "You are a {}. Review the project at {}.\n\n\
+                Read all source files, then produce a markdown report with:\n\
+                - ### [CRITICAL] / [IMPORTANT] / [MINOR] sections\n\
+                - Each finding must have: title, description, file path, line number\n\n\
+                Output format:\n\
+                ### [SEVERITY] Title\n\
+                Description...\n\
+                File: `path/to/file.rs`\n\
+                Line: 42\n\n\
+                Save the report to: {}/{}-review.md",
+                prompt,
+                self.project_path.display(),
+                review_dir.display(),
+                name
+            );
+
+            let output = Command::new("claude")
+                .args([
+                    "-p",
+                    &review_prompt,
+                    "--allowedTools",
+                    "Read,Edit,Bash",
+                    "--max-turns",
+                    "30",
+                ])
+                .current_dir(&self.project_path)
+                .output()
+                .context(format!("Failed to run {} reviewer", name))?;
+
+            if !output.status.success() {
+                log::warn(&format!("{} reviewer exited with non-zero status", name));
+            }
+
+            let stdout = String::from_utf8_lossy(&output.stdout);
+            if !stdout.is_empty() {
+                log::log(&format!("{} review output:\n{}", name, stdout));
+            }
+        }
 
         log::success(&format!("Review phase complete. Reports in: {}", review_dir.display()));
         Ok(review_dir)
@@ -143,19 +195,99 @@ impl Pipeline {
     fn run_execute_phase(&self, plan_path: &PathBuf) -> Result<()> {
         log::log("=== PHASE 3: EXECUTE ===");
 
-        // Read plan and execute each fix
         let plan_content = std::fs::read_to_string(plan_path)
             .context("Failed to read plan file")?;
 
         // Extract Do Now fixes from plan
         let do_now_section = markdown::extract_section(&plan_content, "Do Now");
-        if !do_now_section.is_empty() {
-            log::log("Executing Do Now fixes via Claude Code...");
-            self.execute_via_claude(&do_now_section)?;
+        if do_now_section.is_empty() {
+            log::warn("No Do Now fixes found in plan");
+            return Ok(());
         }
 
-        log::success("Execution complete");
+        log::log(&format!("Found Do Now section ({} chars)", do_now_section.len()));
+
+        // Parse individual fixes from Do Now section
+        let fixes = self.parse_fixes(&do_now_section);
+        log::log(&format!("Parsed {} fixes to execute", fixes.len()));
+
+        for (i, fix) in fixes.iter().enumerate() {
+            log::log(&format!("Executing fix {}/{}: {}", i + 1, fixes.len(), fix.title));
+            
+            let task = format!(
+                "Fix the following issue in the project at {}:\n\n\
+                Title: {}\n\
+                Severity: {}\n\
+                File: {}\n\
+                Description: {}\n\n\
+                Apply the fix directly to the source files. Use Read and Edit tools.",
+                self.project_path.display(),
+                fix.title,
+                fix.severity,
+                fix.file.as_deref().unwrap_or("unknown"),
+                fix.description
+            );
+
+            self.execute_via_claude(&task)?;
+            log::success(&format!("Fix {} complete", i + 1));
+        }
+
+        log::success("Execution phase complete");
         Ok(())
+    }
+
+    /// Parse individual fixes from Do Now markdown section
+    fn parse_fixes(&self, do_now_section: &str) -> Vec<Fix> {
+        let mut fixes = Vec::new();
+        let lines: Vec<&str> = do_now_section.lines().collect();
+        let mut current_fix: Option<Fix> = None;
+
+        for line in lines {
+            let trimmed = line.trim();
+            
+            // New fix starts with "### Fix N:"
+            if trimmed.starts_with("### Fix ") {
+                if let Some(fix) = current_fix.take() {
+                    fixes.push(fix);
+                }
+                let title = trimmed
+                    .trim_start_matches("### Fix ")
+                    .splitn(2, ':')
+                    .nth(1)
+                    .unwrap_or("Unknown")
+                    .trim()
+                    .to_string();
+                current_fix = Some(Fix {
+                    title,
+                    severity: "UNKNOWN".to_string(),
+                    file: None,
+                    description: String::new(),
+                });
+            } else if let Some(ref mut fix) = current_fix {
+                if trimmed.starts_with("**Severity:**") {
+                    fix.severity = trimmed
+                        .trim_start_matches("**Severity:**")
+                        .trim()
+                        .to_string();
+                } else if trimmed.starts_with("**File:**") {
+                    let file_str = trimmed
+                        .trim_start_matches("**File:**")
+                        .trim()
+                        .trim_matches('`')
+                        .to_string();
+                    fix.file = Some(file_str);
+                } else if !trimmed.starts_with("**") && !trimmed.is_empty() && trimmed != "**Description:**" {
+                    fix.description.push_str(line);
+                    fix.description.push('\n');
+                }
+            }
+        }
+
+        if let Some(fix) = current_fix {
+            fixes.push(fix);
+        }
+
+        fixes
     }
 
     fn execute_via_claude(&self, task: &str) -> Result<()> {
@@ -185,6 +317,20 @@ impl Pipeline {
     fn run_release_phase(&self, version: &str) -> Result<()> {
         log::log("=== PHASE 5: RELEASE ===");
 
+        // Build release binary
+        log::log("Building release binary...");
+        let build_output = Command::new("cargo")
+            .args(["build", "--release"])
+            .current_dir(&self.project_path)
+            .output()
+            .context("Failed to build release binary")?;
+
+        if !build_output.status.success() {
+            let stderr = String::from_utf8_lossy(&build_output.stderr);
+            anyhow::bail!("Release build failed: {}", stderr);
+        }
+        log::success("Release build complete");
+
         // Create git tag
         log::log(&format!("Creating tag: {}", version));
         let tag_output = Command::new("git")
@@ -194,8 +340,10 @@ impl Pipeline {
             .context("Failed to create git tag")?;
 
         if !tag_output.status.success() {
-            log::warn("Failed to create tag");
+            let stderr = String::from_utf8_lossy(&tag_output.stderr);
+            anyhow::bail!("Failed to create tag: {}", stderr);
         }
+        log::success(&format!("Tag {} created", version));
 
         // Push tag
         log::log("Pushing tag...");
@@ -206,17 +354,45 @@ impl Pipeline {
             .context("Failed to push tag")?;
 
         if !push_output.status.success() {
-            log::warn("Failed to push tag");
+            let stderr = String::from_utf8_lossy(&push_output.stderr);
+            anyhow::bail!("Failed to push tag: {}", stderr);
+        }
+        log::success("Tag pushed to origin");
+
+        // Create GitHub Release via API
+        log::log("Creating GitHub Release...");
+        let repo = auto_dev_pipeline::git::get_repo_info(&self.project_path)?;
+        let release_json = format!(
+            '{{"tag_name":"{}","name":"Release {}","body":"Auto-generated release","draft":false,"prerelease":false}}',
+            version, version
+        );
+
+        let release_output = Command::new("curl")
+            .args([
+                "-s", "-X", "POST",
+                "-H", "Accept: application/vnd.github+json",
+                "-H", &format!("Authorization: Bearer {}", std::env::var("GITHUB_TOKEN").unwrap_or_default()),
+                "-d", &release_json,
+                &format!("https://api.github.com/repos/{}/releases", repo),
+            ])
+            .output()
+            .context("Failed to create GitHub release")?;
+
+        if !release_output.status.success() {
+            let stderr = String::from_utf8_lossy(&release_output.stderr);
+            log::warn(&format!("GitHub release creation failed: {}", stderr));
+        } else {
+            log::success(&format!("GitHub Release {} created", version));
         }
 
-        log::success(&format!("Release {} created", version));
+        log::success(&format!("Release {} complete", version));
         Ok(())
     }
 
     fn run_verify_phase(&self) -> Result<()> {
         log::log("=== PHASE 4: VERIFY ===");
 
-        // Run local tests
+        // Run local tests (fail-fast)
         self.run_local_tests()?;
 
         // Check CI status
@@ -227,7 +403,8 @@ impl Pipeline {
             .context("Failed to run ci-check")?;
 
         if !ci_output.status.success() {
-            log::warn("CI check found issues");
+            let stderr = String::from_utf8_lossy(&ci_output.stderr);
+            anyhow::bail!("CI check failed: {}", stderr);
         }
 
         let stdout = String::from_utf8_lossy(&ci_output.stdout);
@@ -245,16 +422,26 @@ impl Pipeline {
                 log::log(&format!("Running: {}", result.runner.name()));
                 if result.success {
                     log::success("Local tests passed");
+                    Ok(())
                 } else {
-                    log::warn("Local tests failed");
+                    let stderr_preview = if result.stderr.len() > 200 {
+                        format!("{}...", &result.stderr[..200])
+                    } else {
+                        result.stderr.clone()
+                    };
+                    anyhow::bail!(
+                        "Local tests failed ({}):\nstdout: {}\nstderr: {}",
+                        result.runner.name(),
+                        result.stdout,
+                        stderr_preview
+                    )
                 }
             }
             Err(e) => {
                 log::warn(&format!("No test runner found: {}", e));
+                Ok(())
             }
         }
-
-        Ok(())
     }
 
     fn run(&self) -> Result<()> {

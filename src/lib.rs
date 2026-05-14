@@ -149,3 +149,32 @@ pub mod markdown {
         result.join("\n")
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_extract_section_found() {
+        let content = "# Plan\n\n## Do Now\n- Fix 1\n- Fix 2\n\n## Defer\n- Fix 3";
+        let section = markdown::extract_section(content, "Do Now");
+        assert!(section.contains("Fix 1"));
+        assert!(section.contains("Fix 2"));
+        assert!(!section.contains("Fix 3"));
+    }
+
+    #[test]
+    fn test_extract_section_not_found() {
+        let content = "# Plan\n\n## Other\n- Something";
+        let section = markdown::extract_section(content, "Do Now");
+        assert!(section.is_empty());
+    }
+
+    #[test]
+    fn test_log_functions() {
+        log::log("test message");
+        log::warn("test warning");
+        log::error("test error");
+        log::success("test success");
+    }
+}
