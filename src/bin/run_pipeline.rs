@@ -1,7 +1,7 @@
 use anyhow::{Context, Result};
 use auto_dev_pipeline::{log, markdown, test_runner};
 use clap::{Parser, ValueEnum};
-use shlex::quote;
+use shlex::try_quote;
 use std::path::PathBuf;
 use std::process::Command;
 
@@ -124,6 +124,8 @@ impl Pipeline {
         for (name, prompt) in &reviewers {
             log::log(&format!("Starting {} review...", name));
             
+            let project_path_str = self.project_path.display().to_string();
+            let project_path_quoted = try_quote(&project_path_str)?;
             let review_prompt = format!(
                 "You are a {}. Review the project at {}.\n\n\
                 Read all source files, then produce a markdown report with:\n\
@@ -136,7 +138,7 @@ impl Pipeline {
                 Line: 42\n\n\
                 Save the report to: {}/{}-review.md",
                 prompt,
-                quote(&self.project_path.display().to_string()),
+                project_path_quoted,
                 review_dir.display(),
                 name
             );
@@ -221,6 +223,13 @@ impl Pipeline {
         for (i, fix) in fixes.iter().enumerate() {
             log::log(&format!("Executing fix {}/{}: {}", i + 1, fixes.len(), fix.title));
 
+            let project_path_str = self.project_path.display().to_string();
+            let project_path_quoted = try_quote(&project_path_str)?;
+            let title_quoted = try_quote(&fix.title)?;
+            let severity_quoted = try_quote(&fix.severity)?;
+            let file_quoted = try_quote(fix.file.as_deref().unwrap_or("unknown"))?;
+            let description_quoted = try_quote(&fix.description)?;
+            
             let task = format!(
                 "Fix the following issue in the project at {}:\n\n\
                 Title: {}\n\
@@ -228,11 +237,11 @@ impl Pipeline {
                 File: {}\n\
                 Description: {}\n\n\
                 Apply the fix directly to the source files. Use Read and Edit tools.",
-                quote(&self.project_path.display().to_string()),
-                quote(&fix.title),
-                quote(&fix.severity),
-                quote(&fix.file.as_deref().unwrap_or("unknown")),
-                quote(&fix.description)
+                project_path_quoted,
+                title_quoted,
+                severity_quoted,
+                file_quoted,
+                description_quoted
             );
 
             self.execute_via_claude(&task)?;
