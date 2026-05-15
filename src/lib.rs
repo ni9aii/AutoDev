@@ -93,9 +93,15 @@ pub mod test_runner {
 
 pub mod git {
     use anyhow::{Context, Result};
+    use once_cell::sync::Lazy;
     use regex::Regex;
     use std::path::Path;
     use std::process::Command;
+
+    static GITHUB_REMOTE_RE: Lazy<Regex> = Lazy::new(|| {
+        Regex::new(r"github\.com[:/]([^/]+)/([^/]+?)(?:\.git)?$")
+            .expect("Invalid GITHUB_REMOTE_RE pattern")
+    });
 
     pub fn get_repo_info(project_path: &Path) -> Result<String> {
         let output = Command::new("git")
@@ -110,14 +116,33 @@ pub mod git {
 
         let remote_url = String::from_utf8_lossy(&output.stdout).trim().to_string();
 
-        let re = Regex::new(r"github\.com[:/]([^/]+)/([^/]+?)(?:\.git)?$")?;
-        if let Some(caps) = re.captures(&remote_url) {
+        if let Some(caps) = GITHUB_REMOTE_RE.captures(&remote_url) {
             let owner = &caps[1];
             let repo = &caps[2];
             Ok(format!("{}/{}", owner, repo))
         } else {
             anyhow::bail!("Not a GitHub repository: {}", remote_url)
         }
+    }
+}
+
+pub mod validation {
+    /// Validate a version string for use in git tags and JSON payloads.
+    /// Only allows semver-like strings: starts with optional 'v', then digits and dots.
+    pub fn validate_version(version: &str) -> Result<(), String> {
+        let clean = version.trim();
+        if clean.is_empty() {
+            return Err("Version string is empty".to_string());
+        }
+        // Allow v-prefixed semver: v0.1.0, 1.0.0, v2.0.0-alpha
+        let re = regex::Regex::new(r"^v?\d+\.\d+\.\d+(-[a-zA-Z0-9.]+)?$").unwrap();
+        if !re.is_match(clean) {
+            return Err(format!(
+                "Invalid version '{}'. Expected semver format: v0.1.0 or 1.0.0",
+                clean
+            ));
+        }
+        Ok(())
     }
 }
 
@@ -148,6 +173,18 @@ pub mod markdown {
 
         result.join("\n")
     }
+
+    /// Truncate string safely at char boundary to avoid UTF-8 panic.
+    pub fn safe_truncate(s: &str, max_chars: usize) -> &str {
+        if s.len() <= max_chars {
+            return s;
+        }
+        let mut boundary = max_chars;
+        while boundary > 0 && !s.is_char_boundary(boundary) {
+            boundary -= 1;
+        }
+        &s[..boundary]
+    }
 }
 
 #[cfg(test)]
@@ -176,5 +213,33 @@ mod tests {
         log::warn("test warning");
         log::error("test error");
         log::success("test success");
+    }
+
+    #[test]
+    fn test_safe_truncate_ascii() {
+        assert_eq!(markdown::safe_truncate("hello world", 5), "hello");
+    }
+
+    #[test]
+    fn test_safe_truncate_multibyte() {
+        // Russian: each char is 2 bytes
+        let s = "привет";
+        let truncated = markdown::safe_truncate(s, 5);
+        assert!(truncated.len() <= 5);
+        assert!(s.starts_with(truncated));
+    }
+
+    #[test]
+    fn test_validate_version_valid() {
+        assert!(validation::validate_version("v0.1.0").is_ok());
+        assert!(validation::validate_version("1.0.0").is_ok());
+        assert!(validation::validate_version("v2.0.0-alpha").is_ok());
+    }
+
+    #[test]
+    fn test_validate_version_invalid() {
+        assert!(validation::validate_version("").is_err());
+        assert!(validation::validate_version("; rm -rf /").is_err());
+        assert!(validation::validate_version("$(whoami)").is_err());
     }
 }

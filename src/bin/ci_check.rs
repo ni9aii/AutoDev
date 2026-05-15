@@ -58,12 +58,11 @@ impl CiChecker {
                 .get("message")
                 .and_then(|v| v.as_str())
                 .unwrap_or("Unknown error");
-            log::warn(&format!("GitHub API error ({}): {}", status, msg));
 
             if status.as_u16() == 403 {
                 log::warn("Rate limit exceeded. Set GITHUB_PAT for higher limits.");
             }
-            return Ok(false);
+            anyhow::bail!("GitHub API error ({}): {}", status, msg);
         }
 
         let data: serde_json::Value = response.json().context("Failed to parse GitHub API response")?;
@@ -110,8 +109,7 @@ impl CiChecker {
         }
 
         if !all_passed {
-            log::error("Some recent workflow runs failed!");
-            return Ok(false);
+            anyhow::bail!("Some recent workflow runs failed!");
         }
 
         log::success("All recent CI runs passed");
@@ -126,13 +124,9 @@ impl CiChecker {
             log::success(&format!("Local tests passed ({})", result.runner.name()));
             Ok(())
         } else {
-            let stderr_preview = if result.stderr.len() > 200 {
-                format!("{}...", &result.stderr[..200])
-            } else {
-                result.stderr.clone()
-            };
+            let stderr_preview = auto_dev_pipeline::markdown::safe_truncate(&result.stderr, 200);
             anyhow::bail!(
-                "Local tests failed ({}):\nstdout: {}\nstderr: {}",
+                "Local tests failed ({}):\nstdout: {}\nstderr: {}...",
                 result.runner.name(),
                 result.stdout,
                 stderr_preview
