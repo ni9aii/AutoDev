@@ -1,6 +1,7 @@
 use anyhow::{Context, Result};
 use auto_dev_pipeline::{log, markdown, test_runner};
 use clap::{Parser, ValueEnum};
+use shlex::quote;
 use std::path::PathBuf;
 use std::process::Command;
 
@@ -135,7 +136,7 @@ impl Pipeline {
                 Line: 42\n\n\
                 Save the report to: {}/{}-review.md",
                 prompt,
-                self.project_path.display(),
+                quote(&self.project_path.display().to_string()),
                 review_dir.display(),
                 name
             );
@@ -219,7 +220,7 @@ impl Pipeline {
 
         for (i, fix) in fixes.iter().enumerate() {
             log::log(&format!("Executing fix {}/{}: {}", i + 1, fixes.len(), fix.title));
-            
+
             let task = format!(
                 "Fix the following issue in the project at {}:\n\n\
                 Title: {}\n\
@@ -227,11 +228,11 @@ impl Pipeline {
                 File: {}\n\
                 Description: {}\n\n\
                 Apply the fix directly to the source files. Use Read and Edit tools.",
-                self.project_path.display(),
-                fix.title,
-                fix.severity,
-                fix.file.as_deref().unwrap_or("unknown"),
-                fix.description
+                quote(&self.project_path.display().to_string()),
+                quote(&fix.title),
+                quote(&fix.severity),
+                quote(&fix.file.as_deref().unwrap_or("unknown")),
+                quote(&fix.description)
             );
 
             self.execute_via_claude(&task)?;
