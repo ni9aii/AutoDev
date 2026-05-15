@@ -17,7 +17,7 @@ jobs:
       image: archlinux:latest
     steps:
       - name: Install dependencies
-        run: pacman -Sy --noconfirm curl base-devel
+        run: pacman -Syu --noconfirm curl base-devel
 
       - name: Install Rust
         run: curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
@@ -27,31 +27,12 @@ jobs:
       - name: Run clippy
         run: |
           . $HOME/.cargo/env
-          cargo clippy
+          cargo clippy -- -D warnings
 
       - name: Run tests
         run: |
           . $HOME/.cargo/env
           cargo test --verbose
-
-      - name: Build release
-        run: |
-          . $HOME/.cargo/env
-          cargo build --release
-
-  build-arch:
-    name: Build release on Arch Linux
-    runs-on: ubuntu-latest
-    container:
-      image: archlinux:latest
-    steps:
-      - name: Install dependencies
-        run: pacman -Sy --noconfirm curl base-devel
-
-      - name: Install Rust
-        run: curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
-
-      - uses: actions/checkout@v4
 
       - name: Build release
         run: |

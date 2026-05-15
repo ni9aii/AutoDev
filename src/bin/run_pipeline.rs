@@ -40,11 +40,16 @@ struct Args {
     /// Phase to run
     #[arg(value_enum, default_value = "full")]
     phase: Phase,
+
+    /// Version tag for release (e.g., v0.2.0)
+    #[arg(short, long)]
+    version: Option<String>,
 }
 
 struct Pipeline {
     project_path: PathBuf,
     phase: Phase,
+    version: Option<String>,
     timestamp: String,
     output_dir: PathBuf,
 }
@@ -66,9 +71,10 @@ impl Pipeline {
 
         std::fs::create_dir_all(&output_dir)?;
 
-        Ok(Self {
+            Ok(Self {
             project_path: args.project_path,
             phase: args.phase,
+            version: args.version,
             timestamp,
             output_dir,
         })
@@ -470,10 +476,9 @@ impl Pipeline {
                 self.run_verify_phase()?;
             }
             Phase::Release => {
-                // Release phase — requires version as argument
-                let version = std::env::var("AUTO_DEV_VERSION")
-                    .unwrap_or_else(|_| "v0.1.0".to_string());
-                self.run_release_phase(&version)?;
+                let version = self.version.as_ref()
+                    .context("Release phase requires --version argument (e.g., --version v0.2.0)")?;
+                self.run_release_phase(version)?;
             }
         }
 
