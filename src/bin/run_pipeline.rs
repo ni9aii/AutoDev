@@ -72,7 +72,7 @@ impl Pipeline {
 
         std::fs::create_dir_all(&output_dir)?;
 
-            Ok(Self {
+        Ok(Self {
             project_path: args.project_path,
             phase: args.phase,
             version: args.version,
@@ -80,10 +80,6 @@ impl Pipeline {
             output_dir,
         })
     }
-
-
-
-
 
     fn check_prerequisites(&self) -> Result<()> {
         log::log("Checking prerequisites...");
@@ -333,6 +329,10 @@ impl Pipeline {
     fn run_release_phase(&self, version: &str) -> Result<()> {
         log::log("=== PHASE 5: RELEASE ===");
 
+        // Validate version string (prevent injection)
+        auto_dev_pipeline::validation::validate_version(version)
+            .map_err(|e| anyhow::anyhow!("{}", e))?;
+
         // Build release binary
         log::log("Building release binary...");
         let build_output = Command::new("cargo")
@@ -448,13 +448,9 @@ impl Pipeline {
                     log::success("Local tests passed");
                     Ok(())
                 } else {
-                    let stderr_preview = if result.stderr.len() > 200 {
-                        format!("{}...", &result.stderr[..200])
-                    } else {
-                        result.stderr.clone()
-                    };
+                    let stderr_preview = auto_dev_pipeline::markdown::safe_truncate(&result.stderr, 200);
                     anyhow::bail!(
-                        "Local tests failed ({}):\nstdout: {}\nstderr: {}",
+                        "Local tests failed ({}):\nstdout: {}\nstderr: {}...",
                         result.runner.name(),
                         result.stdout,
                         stderr_preview

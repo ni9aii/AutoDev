@@ -32,11 +32,6 @@ static LINE_RE: Lazy<Regex> = Lazy::new(|| {
     Regex::new(r"(?i)[Ll]ine:\s*(\d+)").expect("Invalid LINE_RE pattern")
 });
 
-static CODE_FILE_RE: Lazy<Regex> = Lazy::new(|| {
-    Regex::new(r"`[^`]+\.(c|h|cpp|hpp|py|rs|toml|yaml|yml|json|md)`")
-        .expect("Invalid CODE_FILE_RE pattern")
-});
-
 /// Review Aggregator for Auto-Dev Pipeline
 /// Aggregates findings from reviewers and generates prioritized fix plan
 #[derive(Parser, Debug)]
@@ -60,8 +55,6 @@ struct Finding {
     file: Option<String>,
     line: Option<usize>,
     classification: String, // "do_now" or "defer"
-    files_affected: usize,
-    estimated_effort: String, // "low", "medium", "high"
 }
 
 /// Self-correction markers that indicate a finding should be skipped
@@ -146,8 +139,6 @@ fn parse_review_file(filepath: &Path) -> Result<Vec<Finding>> {
             .and_then(|cap| cap[1].parse::<usize>().ok());
 
         let classification = classify_finding(&severity, &file, &body);
-        let files_affected = count_files(&body);
-        let estimated_effort = estimate_effort(&severity, &file, &body);
 
         findings.push(Finding {
             role: role.clone(),
@@ -157,8 +148,6 @@ fn parse_review_file(filepath: &Path) -> Result<Vec<Finding>> {
             file,
             line,
             classification,
-            files_affected,
-            estimated_effort,
         });
     }
 
@@ -166,7 +155,6 @@ fn parse_review_file(filepath: &Path) -> Result<Vec<Finding>> {
 }
 
 fn classify_finding(severity: &str, file: &Option<String>, body: &str) -> String {
-    // Do Now: CRITICAL/IMPORTANT with specific file, low complexity
     let is_critical = severity == "CRITICAL" || severity == "IMPORTANT";
     let has_file = file.is_some();
     let is_simple = !body.contains("refactor") 
@@ -178,21 +166,6 @@ fn classify_finding(severity: &str, file: &Option<String>, body: &str) -> String
         "do_now".to_string()
     } else {
         "defer".to_string()
-    }
-}
-
-fn count_files(body: &str) -> usize {
-    CODE_FILE_RE.find_iter(body).count().max(1)
-}
-
-fn estimate_effort(severity: &str, _file: &Option<String>, body: &str) -> String {
-    let body_lower = body.to_lowercase();
-    if body_lower.contains("refactor") || body_lower.contains("architecture") || body_lower.contains("redesign") {
-        "high".to_string()
-    } else if severity == "CRITICAL" || body_lower.contains("security") {
-        "medium".to_string()
-    } else {
-        "low".to_string()
     }
 }
 
@@ -263,7 +236,6 @@ fn generate_plan(findings: &[Finding], output_path: &Path) -> Result<()> {
             lines.push(format!("### Fix {}: {}", i + 1, finding.title));
             lines.push(format!("\n**Source:** {} Reviewer", finding.role));
             lines.push(format!("**Severity:** {}", finding.severity));
-            lines.push(format!("**Effort:** {}", finding.estimated_effort));
             if let Some(ref file) = finding.file {
                 lines.push(format!("**File:** `{}`", file));
             }
@@ -287,7 +259,6 @@ fn generate_plan(findings: &[Finding], output_path: &Path) -> Result<()> {
             lines.push(format!("### Deferred {}: {}", i + 1, finding.title));
             lines.push(format!("\n**Source:** {} Reviewer", finding.role));
             lines.push(format!("**Severity:** {}", finding.severity));
-            lines.push(format!("**Effort:** {}", finding.estimated_effort));
             if let Some(ref file) = finding.file {
                 lines.push(format!("**File:** `{}`", file));
             }
@@ -296,8 +267,6 @@ fn generate_plan(findings: &[Finding], output_path: &Path) -> Result<()> {
             lines.push(String::new());
         }
     }
-
-    // Old severity-based sections (kept for compatibility)
 
     // Write output
     fs::write(output_path, lines.join("\n"))?;
