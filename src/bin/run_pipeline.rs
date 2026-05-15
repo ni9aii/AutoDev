@@ -375,33 +375,38 @@ impl Pipeline {
         }
         log::success("Tag pushed to origin");
 
-        // Create GitHub Release via API
+        // Create GitHub Release via API (reqwest — token stays in process memory)
         log::log("Creating GitHub Release...");
         let repo = auto_dev_pipeline::git::get_repo_info(&self.project_path)?;
-        let release_json = format!(
+        let token = std::env::var("GITHUB_TOKEN")
+            .or_else(|_| std::env::var("GITHUB_PAT"))
+            .context("GITHUB_TOKEN or GITHUB_PAT must be set")?;
+
+        let release_url = format!("https://api.github.com/repos/{}/releases", repo);
+        let release_body = format!(
             "{{\"tag_name\":\"{}\",\"name\":\"Release {}\",\"body\":\"Auto-generated release\",\"draft\":false,\"prerelease\":false}}",
             version, version
         );
 
-        let token = std::env::var("GITHUB_TOKEN")
-            .or_else(|_| std::env::var("GITHUB_PAT"))
-            .context("GITHUB_TOKEN or GITHUB_PAT must be set")?;
-        let release_output = Command::new("curl")
-            .args([
-                "-s", "-X", "POST",
-                "-H", "Accept: application/vnd.github+json",
-                "-H", &format!("Authorization: Bearer {}", token),
-                "-d", &release_json,
-                &format!("https://api.github.com/repos/{}/releases", repo),
-            ])
-            .output()
+        let client = reqwest::blocking::Client::builder()
+            .timeout(std::time::Duration::from_secs(30))
+            .build()
+            .context("Failed to create HTTP client")?;
+        let response = client
+            .post(&release_url)
+            .header("Accept", "application/vnd.github+json")
+            .header("Authorization", format!("Bearer {}", token))
+            .header("User-Agent", "auto-dev-pipeline/1.0")
+            .body(release_body)
+            .send()
             .context("Failed to create GitHub release")?;
 
-        if !release_output.status.success() {
-            let stderr = String::from_utf8_lossy(&release_output.stderr);
-            log::warn(&format!("GitHub release creation failed: {}", stderr));
-        } else {
+        if response.status().is_success() {
             log::success(&format!("GitHub Release {} created", version));
+        } else {
+            let status = response.status();
+            let body = response.text().unwrap_or_default();
+            log::warn(&format!("GitHub release creation failed ({}): {}", status, body));
         }
 
         log::success(&format!("Release {} complete", version));

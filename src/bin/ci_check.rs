@@ -2,7 +2,6 @@ use anyhow::{Context, Result};
 use auto_dev_pipeline::{git, log};
 use clap::Parser;
 use std::path::PathBuf;
-use std::process::Command;
 
 /// CI Status Checker for Auto-Dev Pipeline
 /// Checks GitHub Actions status via API
@@ -121,47 +120,24 @@ impl CiChecker {
 
     fn check_local_tests(&self) -> Result<()> {
         log::log("Checking local test status...");
-
-        if self.project_path.join("Makefile").exists() {
-            let output = Command::new("make")
-                .arg("test")
-                .current_dir(&self.project_path)
-                .output()?;
-            if output.status.success() {
-                log::success("Local tests passed (make test)");
-            } else {
-                let stderr = String::from_utf8_lossy(&output.stderr);
-                anyhow::bail!("Local tests failed (make test): {}", stderr);
-            }
-        } else if self.project_path.join("package.json").exists() {
-            let output = Command::new("npm")
-                .arg("test")
-                .current_dir(&self.project_path)
-                .output()?;
-            if output.status.success() {
-                log::success("Local tests passed (npm test)");
-            } else {
-                let stderr = String::from_utf8_lossy(&output.stderr);
-                anyhow::bail!("Local tests failed (npm test): {}", stderr);
-            }
-        } else if self.project_path.join("pyproject.toml").exists()
-            || self.project_path.join("setup.py").exists()
-        {
-            let output = Command::new("pytest")
-                .current_dir(&self.project_path)
-                .output()?;
-            if output.status.success() {
-                log::success("Local tests passed (pytest)");
-            } else {
-                let stderr = String::from_utf8_lossy(&output.stderr);
-                anyhow::bail!("Local tests failed (pytest): {}", stderr);
-            }
+        let result = auto_dev_pipeline::test_runner::run_local_tests(&self.project_path)?;
+        log::log(&format!("Running: {}", result.runner.name()));
+        if result.success {
+            log::success(&format!("Local tests passed ({})", result.runner.name()));
+            Ok(())
         } else {
-            log::warn("No test runner found (no Makefile, package.json, or pyproject.toml)");
-            anyhow::bail!("No test runner found in project");
+            let stderr_preview = if result.stderr.len() > 200 {
+                format!("{}...", &result.stderr[..200])
+            } else {
+                result.stderr.clone()
+            };
+            anyhow::bail!(
+                "Local tests failed ({}):\nstdout: {}\nstderr: {}",
+                result.runner.name(),
+                result.stdout,
+                stderr_preview
+            )
         }
-
-        Ok(())
     }
 
     fn run(&self) -> Result<()> {
