@@ -37,7 +37,10 @@ impl CiChecker {
             repo
         );
 
-        let client = reqwest::blocking::Client::new();
+        let client = reqwest::blocking::Client::builder()
+            .timeout(std::time::Duration::from_secs(30))
+            .build()
+            .context("Failed to create HTTP client")?;
         let mut request = client
             .get(&api_url)
             .header("Accept", "application/vnd.github+json")
