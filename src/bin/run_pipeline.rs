@@ -458,7 +458,7 @@ impl Pipeline {
             }
             Err(e) => {
                 log::warn(&format!("No test runner found: {}", e));
-                Ok(())
+                anyhow::bail!("No test runner found in project: {}", e)
             }
         }
     }
@@ -488,6 +488,7 @@ impl Pipeline {
             Phase::Release => {
                 let version = self.version.as_ref()
                     .context("Release phase requires --version argument (e.g., --version v0.2.0)")?;
+                self.run_verify_phase()?;
                 self.run_release_phase(version)?;
             }
         }

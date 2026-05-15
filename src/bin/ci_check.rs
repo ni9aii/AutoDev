@@ -156,6 +156,9 @@ impl CiChecker {
                 let stderr = String::from_utf8_lossy(&output.stderr);
                 anyhow::bail!("Local tests failed (pytest): {}", stderr);
             }
+        } else {
+            log::warn("No test runner found (no Makefile, package.json, or pyproject.toml)");
+            anyhow::bail!("No test runner found in project");
         }
 
         Ok(())
