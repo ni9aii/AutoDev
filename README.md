@@ -1,89 +1,126 @@
 # AutoDev Pipeline
 
-Автоматический пайплайн разработки: ревью → план → исполнение → CI → релиз.
+Automated development pipeline: review → plan → execute → verify → release.
 
-## Архитектура
+## Architecture
 
-**Hermes Agent (оркестратор) + Claude Code (исполнитель)**
+**Hermes Agent (orchestrator) + Claude Code (executor)**
 
-- Hermes: планирование, агрегация, принятие решений, простые патчи
-- Claude Code: все задачи кодирования — фиксы, рефакторинг, тесты, CI debug
+- Hermes: planning, aggregation, decision-making, simple patches
+- Claude Code: all coding tasks — fixes, refactoring, tests, CI debugging
 
-## Возможности
+## Features
 
-- **4 параллельных ревьюера**: Code, Security, Architecture, DevOps
-- **Агрегация находок**: классификация Do Now / Defer
-- **Автоматическое исполнение**: простые фиксы через Hermes, сложные через Claude Code
-- **CI интеграция**: проверка GitHub Actions статуса
-- **Релиз**: создание git тега и GitHub Release
+- **4 parallel reviewers**: Code, Security, Architecture, DevOps
+- **Finding aggregation**: Do Now / Defer classification
+- **Automated execution**: simple fixes via Hermes, complex via Claude Code
+- **CI integration**: GitHub Actions status checking
+- **Release**: git tag + GitHub Release creation
 
-## Установка
+## Installation
 
 ```bash
-# Клонирование
+# Clone
 git clone https://github.com/ni9aii/AutoDev.git
 cd AutoDev
 
-# Сборка
+# Build
 cargo build --release
 
-# Установка бинарников в PATH
+# Install binaries to PATH
 cargo install --path .
 ```
 
-## Требования
+## Requirements
 
 - Rust 1.70+
 - Claude Code CLI (`npm install -g @anthropic-ai/claude-code`)
-- GitHub PAT (для CI проверки и релизов)
+- GitHub PAT (for CI checks and releases)
 
-## Использование
+## Usage
 
-### Полный пайплайн
+### Full pipeline
 
 ```bash
 run-pipeline /path/to/project full
 ```
 
-### Только ревью
+### Review only
 
 ```bash
 run-pipeline /path/to/project review
 ```
 
-### Ревью + планирование
+### Review + planning
 
 ```bash
 run-pipeline /path/to/project plan
 ```
 
-### Релиз
+### Release
 
 ```bash
 run-pipeline /path/to/project release --version v0.2.0
 ```
 
-## Переменные окружения
+## Environment Variables
 
-- `GITHUB_TOKEN` или `GITHUB_PAT` — для GitHub API
-- `AUTO_DEV_VERSION` — версия для релиза (fallback)
+| Variable | Description |
+|----------|-------------|
+| `GITHUB_TOKEN` / `GITHUB_PAT` | GitHub API authentication |
+| `AUTO_DEV_VERSION` | Fallback version for release phase |
 
-## Структура проекта
+## Project Structure
 
 ```
 .
 ├── src/
-│   ├── lib.rs              # Общие модули (log, git, markdown, test_runner)
+│   ├── lib.rs                  # Shared modules (log, git, markdown, test_runner)
 │   └── bin/
-│       ├── run_pipeline.rs # Основной пайплайн
-│       ├── ci_check.rs     # Проверка CI статуса
-│       └── review_aggregator.rs # Агрегация ревью
+│       ├── run_pipeline.rs     # Main pipeline entry point
+│       ├── ci_check.rs         # CI status checker
+│       └── review_aggregator.rs # Review aggregation + plan generation
 ├── .github/workflows/
-│   └── ci.yml              # CI конфигурация
+│   └── ci.yml                  # CI configuration (Arch Linux)
 ├── Cargo.toml
-└── README.md
+├── README.md
+├── CHANGELOG.md
+└── LICENSE
 ```
 
-## Лицензия
+## Pipeline Phases
 
-MIT License — см. [LICENSE](LICENSE)
+### Phase 1 — Review
+
+Launches 4 reviewers via Claude Code in parallel (3 at a time due to concurrency limits). Each reviewer produces a markdown report with findings classified as CRITICAL / IMPORTANT / MINOR.
+
+Reviewers use **structured file discovery** to avoid context overflow:
+1. List project structure via `search_files`
+2. Search for relevant patterns (hotspots)
+3. Read only matching files
+
+### Phase 2 — Aggregate
+
+The `review-aggregator` binary collects all findings, deduplicates, classifies as Do Now / Defer, and writes a fix plan in markdown.
+
+### Phase 3 — Execute
+
+For each Do Now item:
+- Simple fixes (≤2 files, ≤20 lines) → Hermes applies directly
+- Complex tasks → delegated to Claude Code print mode
+
+### Phase 4 — Verify
+
+Runs local tests and checks CI status. Fails if tests don't pass.
+
+### Phase 5 — Release
+
+Runs verify first, then:
+1. Builds release binary (`cargo build --release`)
+2. Creates annotated git tag
+3. Pushes tag to origin
+4. Creates GitHub Release via API
+
+## License
+
+MIT License — see [LICENSE](LICENSE)
