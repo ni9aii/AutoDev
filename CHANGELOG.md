@@ -1,35 +1,52 @@
 # Changelog
 
+## [0.3.0] - 2026-05-15
+
+### Fixed (CRITICAL)
+- GitHub token exposed in process list via `curl` — replaced with reqwest (token stays in memory)
+- No Rust toolchain pinning — added rust-toolchain.toml (channel 1.95)
+- CI checkout after toolchain install — reordered steps (checkout first)
+- Duplicated test-runner logic — ci_check now uses lib::test_runner
+
+### Fixed (IMPORTANT)
+- Version string injection — added validation (semver-only: v0.1.0 or 1.0.0)
+- API errors swallowed as Ok(false) — now propagate as Err
+- CI failures silently discarded — now propagate as Err
+- Regex recompiled on every call in git::get_repo_info — cached via once_cell::Lazy
+- UTF-8 truncation panic risk — added safe_truncate() function
+
+### Fixed (MINOR)
+- Dead fields removed: files_affected, estimated_effort
+- Dead functions removed: count_files, estimate_effort
+- Dead regex removed: CODE_FILE_RE
+- Dead comment removed: "Old severity-based sections (kept for compatibility)"
+- TODO removed from Cargo.toml dev-dependencies
+- Inconsistent indentation in Pipeline::new
+- Extra blank lines removed
+- Phase numbering: Release now labeled "PHASE 5"
+- CI badge added to README
+- .env.example added
+- CONTRIBUTING.md added
+
+### Known Limitations
+- PATH hijack risk: bare Command::new("claude"), etc. Users must control PATH.
+- parse_fixes: fragile markdown parser. Works with current aggregator format.
+- Architectural debt: Pipeline God object (500 LOC), tight coupling via subprocess.
+- No release/deploy CI workflow.
+- No Dependabot/Renovate.
+
 ## [0.2.0] - 2026-05-15
 
 ### Fixed
 - GITHUB_TOKEN interpolation in release curl command (CRITICAL)
-- Release phase now runs verify before creating tag
-- ci_check returns Err when no test runner found
-- Removed regex look-ahead (not supported in Rust regex crate)
-- Fixed clippy warnings: needless_borrow, deprecated shlex::quote
-- Fixed review_aggregator path validation blocking output
+- Add verify phase before release tag creation
+- Fix ci_check to return Err when no test runner found
 
 ### Added
-- README.md with installation and usage instructions
+- README.md with installation and usage
 - LICENSE (MIT)
 - CHANGELOG.md
-- .gitignore for Rust project
-- Cargo.lock (was empty, now generated)
-- reqwest timeout (30s) in ci_check
-- --version CLI argument for release phase
 
-### Changed
-- CI workflow: merged redundant build-arch job, pacman -Syu, clippy -D warnings
-- Replaced shlex::quote with try_quote
-- Reviewer prompts now use structured file discovery (less context overflow)
+## [0.1.0] - 2026-05-11
 
-## [0.1.0] - 2026-05-14
-
-### Added
-- Initial release
-- 4 reviewer pipeline (Code, Security, Architecture, DevOps)
-- Review aggregation with Do Now / Defer classification
-- Execute phase with Claude Code delegation
-- CI status checking via GitHub API
-- Release phase (tag + GitHub Release)
+Initial release. Basic pipeline: review → plan → execute → verify → release.
