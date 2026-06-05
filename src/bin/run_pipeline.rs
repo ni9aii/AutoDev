@@ -145,7 +145,7 @@ impl Pipeline {
     fn run_review_phase_hermes(&self) -> Result<PathBuf> {
         log::log("=== PHASE 1: REVIEW (Hermes Mode) ===");
         log::log("In Hermes mode, reviews are performed by delegate_task subagents.");
-        log::log("Run the following 4 delegate_task calls (3 at a time max):");
+        log::log("Run the following 4 delegate_task calls one at a time (sequential to avoid rate limits):");
         println!();
 
         let _project_name = self.project_name.clone()
