@@ -76,9 +76,14 @@ struct Fix {
 impl Pipeline {
     fn new(args: Args) -> Result<Self> {
         let timestamp = chrono::Local::now().format("%Y%m%d_%H%M%S").to_string();
+
+        // Validate project_path: must exist and not contain path traversal
+        let project_path = std::fs::canonicalize(&args.project_path)
+            .with_context(|| format!("Invalid project path: {}", args.project_path.display()))?;
+
         let output_dir = if args.hermes_mode {
             let project = args.project.clone()
-                .or_else(|| args.project_path.file_name()
+                .or_else(|| project_path.file_name()
                     .and_then(|n| n.to_str())
                     .map(|s| s.to_string()))
                 .unwrap_or_else(|| "unknown".to_string());
@@ -97,7 +102,7 @@ impl Pipeline {
         std::fs::create_dir_all(&output_dir)?;
 
         Ok(Self {
-            project_path: args.project_path,
+            project_path,
             phase: args.phase,
             version: args.version,
             hermes_mode: args.hermes_mode,
