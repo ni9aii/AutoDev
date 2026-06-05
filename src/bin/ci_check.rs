@@ -32,10 +32,12 @@ impl CiChecker {
     }
 
     fn check_ci_status(&self, repo: &str) -> Result<bool> {
-        let token = std::env::var("GITHUB_PAT").ok();
+        let token = std::env::var("GITHUB_PAT")
+            .ok()
+            .or_else(|| self.gh_auth_token().ok());
 
         if token.is_none() {
-            log::warn("GITHUB_PAT not set, trying without auth (public repos only)");
+            log::warn("GITHUB_PAT not set and gh auth token failed, trying without auth (public repos only)");
         }
 
         log::log(&format!("Checking CI status for: {}", repo));
@@ -202,6 +204,23 @@ impl CiChecker {
 
         log::success("All checks complete!");
         Ok(())
+    }
+
+    /// Try to get GitHub token from `gh auth token` CLI
+    fn gh_auth_token(&self) -> Result<String> {
+        let output = std::process::Command::new("gh")
+            .args(["auth", "token"])
+            .output()
+            .context("Failed to run 'gh auth token'")?;
+
+        if !output.status.success() {
+            let stderr = String::from_utf8_lossy(&output.stderr);
+            anyhow::bail!("gh auth token failed: {}", stderr);
+        }
+
+        let token = String::from_utf8(output.stdout)
+            .context("gh auth token returned invalid UTF-8")?;
+        Ok(token.trim().to_string())
     }
 
     fn save_dev_notes_report(
