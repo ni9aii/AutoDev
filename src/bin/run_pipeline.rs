@@ -566,7 +566,7 @@ impl Pipeline {
         let response = client
             .post(&release_url)
             .header("Accept", "application/vnd.github+json")
-            .header("Authorization", format!("Bearer {}", token))
+            .bearer_auth(token)
             .header("User-Agent", "auto-dev-pipeline/1.0")
             .body(release_body)
             .send()
