@@ -32,7 +32,7 @@ impl std::fmt::Display for Phase {
 /// Auto-Dev Pipeline Entry Point
 /// Orchestrates: review → aggregate → execute → verify
 #[derive(Parser, Debug)]
-#[command(name = "run-pipeline", version = "1.1.0", about = "Auto-Dev Pipeline")]
+#[command(name = "run-pipeline", version = "1.1.0", about = "Auto-Dev Pipeline", disable_version_flag = true)]
 struct Args {
     /// Project path
     #[arg(default_value = ".")]
@@ -43,7 +43,7 @@ struct Args {
     phase: Phase,
 
     /// Version tag for release (e.g., v0.2.0)
-    #[arg(short, long)]
+    #[arg(short = 'V', long = "release-version")]
     version: Option<String>,
 
     /// Hermes mode: use delegate_task instead of Claude CLI
@@ -148,7 +148,7 @@ impl Pipeline {
         log::log("Run the following 4 delegate_task calls (3 at a time max):");
         println!();
 
-        let project_name = self.project_name.clone()
+        let _project_name = self.project_name.clone()
             .or_else(|| self.project_path.file_name()
                 .and_then(|n| n.to_str())
                 .map(|s| s.to_string()))

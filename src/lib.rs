@@ -28,6 +28,7 @@ pub mod test_runner {
         Make,
         Npm,
         Pytest,
+        Cargo,
     }
 
     impl TestRunner {
@@ -36,12 +37,15 @@ pub mod test_runner {
                 TestRunner::Make => "make test",
                 TestRunner::Npm => "npm test",
                 TestRunner::Pytest => "pytest",
+                TestRunner::Cargo => "cargo test",
             }
         }
     }
 
     pub fn detect_test_runner(project_path: &Path) -> Option<TestRunner> {
-        if project_path.join("Makefile").exists() {
+        if project_path.join("Cargo.toml").exists() {
+            Some(TestRunner::Cargo)
+        } else if project_path.join("Makefile").exists() {
             Some(TestRunner::Make)
         } else if project_path.join("package.json").exists() {
             Some(TestRunner::Npm)
@@ -66,6 +70,11 @@ pub mod test_runner {
             .context("No test runner detected (Makefile, package.json, pyproject.toml, setup.py)")?;
 
         let output = match runner {
+            TestRunner::Cargo => Command::new("cargo")
+                .arg("test")
+                .current_dir(project_path)
+                .output()
+                .context("Failed to run 'cargo test'")?,
             TestRunner::Make => Command::new("make")
                 .arg("test")
                 .current_dir(project_path)
