@@ -285,13 +285,50 @@ fn generate_plan(findings: &[Finding], output_path: &Path) -> Result<()> {
 fn main() -> Result<()> {
     let args = Args::parse();
 
-    if !args.input_dir.exists() {
-        anyhow::bail!("Input directory not found: {}", args.input_dir.display());
+    // Resolve dev-notes paths if --dev-notes flag is set
+    let (input_dir, output_path) = if args.dev_notes {
+        let project = args.project.as_ref().context(
+            "--project is required when --dev-notes is enabled"
+        )?;
+        let home = dirs::home_dir().context("Could not determine home directory")?;
+        let reviews_dir = home.join("dev-notes").join(project).join("reviews");
+
+        // Find the most recent timestamp directory
+        let latest_dir = fs::read_dir(&reviews_dir)
+            .with_context(|| format!("Failed to read reviews dir: {}", reviews_dir.display()))?
+            .filter_map(|e| e.ok())
+            .filter(|e| e.path().is_dir())
+            .map(|e| e.path())
+            .max();
+
+        let input_dir = latest_dir.with_context(|| {
+            format!("No review directories found in {}", reviews_dir.display())
+        })?;
+
+        let timestamp = input_dir
+            .file_name()
+            .and_then(|n| n.to_str())
+            .unwrap_or("unknown");
+        let plans_dir = home.join("dev-notes").join(project).join("plans");
+        fs::create_dir_all(&plans_dir)?;
+        let output_path = plans_dir.join(format!("{}-plan.md", timestamp));
+
+        println!("[auto-dev] dev-notes mode enabled");
+        println!("[auto-dev] Input:  {}", input_dir.display());
+        println!("[auto-dev] Output: {}", output_path.display());
+
+        (input_dir, output_path)
+    } else {
+        (args.input_dir.clone(), args.output.clone())
+    };
+
+    if !input_dir.exists() {
+        anyhow::bail!("Input directory not found: {}", input_dir.display());
     }
 
     // Parse all review files
     let mut all_findings = Vec::new();
-    for entry in WalkDir::new(&args.input_dir)
+    for entry in WalkDir::new(&input_dir)
         .into_iter()
         .filter_map(|e| e.ok())
         .filter(|e| e.path().extension().is_some_and(|ext| ext == "md"))
@@ -310,8 +347,8 @@ fn main() -> Result<()> {
     }
 
     // Generate plan
-    generate_plan(&all_findings, &args.output)?;
-    println!("Plan generated: {}", args.output.display());
+    generate_plan(&all_findings, &output_path)?;
+    println!("Plan generated: {}", output_path.display());
     println!("Total findings: {}", all_findings.len());
 
     // Summary
