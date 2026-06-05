@@ -1,4 +1,4 @@
-use anyhow::Result;
+use anyhow::{Context, Result};
 use clap::Parser;
 use once_cell::sync::Lazy;
 use regex::Regex;
@@ -35,7 +35,7 @@ static LINE_RE: Lazy<Regex> = Lazy::new(|| {
 /// Review Aggregator for Auto-Dev Pipeline
 /// Aggregates findings from reviewers and generates prioritized fix plan
 #[derive(Parser, Debug)]
-#[command(name = "review-aggregator", version = "1.0.0")]
+#[command(name = "review-aggregator", version = "1.1.0")]
 struct Args {
     /// Directory with review reports
     #[arg(long)]
@@ -44,6 +44,15 @@ struct Args {
     /// Output plan file path
     #[arg(long)]
     output: PathBuf,
+
+    /// Project name (used for dev-notes path construction)
+    #[arg(long)]
+    project: Option<String>,
+
+    /// Auto-construct dev-notes paths: read from ~/dev-notes/<project>/reviews/<timestamp>/
+    /// and write to ~/dev-notes/<project>/plans/<timestamp>-plan.md
+    #[arg(long, default_value = "false")]
+    dev_notes: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
