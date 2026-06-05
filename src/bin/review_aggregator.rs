@@ -37,13 +37,13 @@ static LINE_RE: Lazy<Regex> = Lazy::new(|| {
 #[derive(Parser, Debug)]
 #[command(name = "review-aggregator", version = "1.1.0")]
 struct Args {
-    /// Directory with review reports
-    #[arg(long)]
-    input_dir: PathBuf,
+    /// Directory with review reports (optional if --dev-notes is set)
+    #[arg(long, required = false)]
+    input_dir: Option<PathBuf>,
 
-    /// Output plan file path
-    #[arg(long)]
-    output: PathBuf,
+    /// Output plan file path (optional if --dev-notes is set)
+    #[arg(long, required = false)]
+    output: Option<PathBuf>,
 
     /// Project name (used for dev-notes path construction)
     #[arg(long)]
@@ -319,7 +319,15 @@ fn main() -> Result<()> {
 
         (input_dir, output_path)
     } else {
-        (args.input_dir.clone(), args.output.clone())
+        let input_dir = args
+            .input_dir
+            .clone()
+            .context("--input-dir is required when --dev-notes is not set")?;
+        let output_path = args
+            .output
+            .clone()
+            .context("--output is required when --dev-notes is not set")?;
+        (input_dir, output_path)
     };
 
     if !input_dir.exists() {
