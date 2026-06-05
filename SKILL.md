@@ -16,8 +16,23 @@ It provides three binaries that accelerate the review-fix-release cycle:
 - **review-aggregator** — collects review findings, deduplicates, classifies as Do Now / Defer
 - **ci-check** — checks GitHub Actions CI status and runs local tests
 
-The binaries are **optional accelerators**. The pipeline can run entirely through Hermes tools
-(`delegate_task`, `terminal`, `patch`) as described in the skill.
+## Two Modes of Operation
+
+### Hermes Mode (MVP, default going forward)
+
+All tasks execute via Hermes Agent native tools:
+- Reviews: `delegate_task` subagents (4 parallel reviewers)
+- Simple fixes: `read_file` + `patch`
+- Complex fixes: `delegate_task` subagents
+- Aggregation: `review-aggregator --dev-notes`
+- Verification: `ci-check --dev-notes`
+
+No external harnesses required. Rust binaries are optional accelerators.
+
+### Legacy Mode
+
+Uses Claude Code CLI (`claude -p`) for reviews and execution.
+Requires `npm install -g @anthropic-ai/claude-code`.
 
 ## Build
 
@@ -29,6 +44,24 @@ Binaries install to `target/release/`.
 
 ## Usage
 
+### Hermes Mode
+
+```bash
+# Full pipeline
+run-pipeline /path/to/project full --hermes-mode --project myproject
+
+# Review only
+run-pipeline /path/to/project review --hermes-mode --project myproject
+
+# Review + plan
+run-pipeline /path/to/project plan --hermes-mode --project myproject
+
+# Release (same in both modes)
+run-pipeline /path/to/project release --version v0.2.0
+```
+
+### Legacy Mode
+
 ```bash
 # Full pipeline
 run-pipeline /path/to/project full
@@ -39,8 +72,18 @@ run-pipeline /path/to/project review
 # Review + plan
 run-pipeline /path/to/project plan
 
-# Release (runs verify first, then tags and creates GitHub Release)
+# Release
 run-pipeline /path/to/project release --version v0.2.0
+```
+
+### Direct binary usage
+
+```bash
+# Aggregation with dev-notes auto-paths
+review-aggregator --dev-notes --project myproject
+
+# CI check with dev-notes report
+ ci-check /path/to/project --dev-notes --project myproject
 ```
 
 ## Environment Variables
@@ -78,6 +121,25 @@ run-pipeline /path/to/project release --version v0.2.0
 
 The project uses GitHub Actions with an Arch Linux container.
 Pipeline: `cargo test` → `cargo clippy -- -D warnings` → `cargo build --release`.
+
+## dev-notes Integration
+
+When using `--dev-notes` flag:
+
+```
+~/dev-notes/
+└── <project>/
+    ├── reviews/
+    │   └── YYYYMMDD_HHMMSS/
+    │       ├── code-review.md
+    │       ├── security-review.md
+    │       ├── architecture-review.md
+    │       └── devops-review.md
+    ├── plans/
+    │   └── YYYYMMDD_HHMMSS-plan.md
+    └── ci-reports/
+        └── YYYYMMDD_HHMMSS-ci-status.md
+```
 
 ## References
 

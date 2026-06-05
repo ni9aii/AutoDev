@@ -4,20 +4,110 @@
 
 Automated development pipeline: review → plan → execute → verify → release.
 
-## Architecture
+## Architecture (MVP)
 
-**Hermes Agent (orchestrator) + Claude Code (executor)**
+**Hermes Agent (orchestrator) + delegate_task subagents (executors)**
 
-- Hermes: planning, aggregation, decision-making, simple patches
-- Claude Code: all coding tasks — fixes, refactoring, tests, CI debugging
+All tasks run inside Hermes Agent. No external harnesses required.
+Rust binaries are optional accelerators.
 
-## Features
+| Component | Role | Implementation |
+|-----------|------|----------------|
+| Hermes skill `autodev` | Orchestration, decision-making | `~/.hermes/skills/autonomous-ai-agents/autodev/` |
+| `delegate_task` | Reviewers, complex fixes | Hermes native |
+| `patch` / `read_file` | Simple fixes (≤2 files, ≤20 lines) | Hermes native |
+| `review-aggregator` | Finding aggregation, plan generation | Rust binary |
+| `ci-check` | CI status + local tests | Rust binary |
+| `run-pipeline` | Phase orchestration (legacy + Hermes mode) | Rust binary |
 
-- **4 parallel reviewers**: Code, Security, Architecture, DevOps
-- **Finding aggregation**: Do Now / Defer classification
-- **Automated execution**: simple fixes via Hermes, complex via Claude Code
-- **CI integration**: GitHub Actions status checking
-- **Release**: git tag + GitHub Release creation
+## Quick Start
+
+### Hermes Mode (MVP)
+
+```bash
+# Full pipeline with Hermes delegate_task
+run-pipeline /path/to/project full --hermes-mode --project myproject
+
+# Review only
+run-pipeline /path/to/project review --hermes-mode --project myproject
+
+# Review + plan
+run-pipeline /path/to/project plan --hermes-mode --project myproject
+
+# Release
+run-pipeline /path/to/project release --version v0.2.0
+```
+
+### Legacy Mode (Claude Code CLI)
+
+```bash
+# Requires `claude` CLI installed
+run-pipeline /path/to/project full
+```
+
+## Hermes Mode Workflow
+
+### Phase 1 — Review
+
+`run-pipeline --hermes-mode` prints delegate_task instructions for 4 parallel reviewers:
+
+```python
+delegate_task(
+    goal="Code Reviewer: check logic, style, idioms, performance",
+    context="""
+    PROJECT_PATH: /path/to/project
+    OUTPUT_PATH: ~/dev-notes/myproject/reviews/20260606_143022/code-review.md
+    """,
+    toolsets=['file', 'search_files', 'terminal']
+)
+```
+
+Reports saved to `~/dev-notes/<project>/reviews/<timestamp>/`.
+
+### Phase 2 — Aggregate
+
+```bash
+review-aggregator --dev-notes --project myproject
+```
+
+Auto-discovers latest reviews, generates plan at `~/dev-notes/<project>/plans/<timestamp>-plan.md`.
+
+### Phase 3 — Execute
+
+Hermes mode prints per-fix instructions:
+- Simple fixes → `read_file` + `patch`
+- Complex fixes → `delegate_task`
+
+### Phase 4 — Verify
+
+```bash
+ci-check /path/to/project --dev-notes --project myproject
+```
+
+Saves report to `~/dev-notes/<project>/ci-reports/<timestamp>-ci-status.md`.
+
+### Phase 5 — Release
+
+```bash
+run-pipeline /path/to/project release --version v0.2.0
+```
+
+## Directory Layout (dev-notes)
+
+```
+~/dev-notes/
+└── <project>/
+    ├── reviews/
+    │   └── YYYYMMDD_HHMMSS/
+    │       ├── code-review.md
+    │       ├── security-review.md
+    │       ├── architecture-review.md
+    │       └── devops-review.md
+    ├── plans/
+    │   └── YYYYMMDD_HHMMSS-plan.md
+    └── ci-reports/
+        └── YYYYMMDD_HHMMSS-ci-status.md
+```
 
 ## Installation
 
@@ -26,44 +116,18 @@ Automated development pipeline: review → plan → execute → verify → relea
 git clone https://github.com/ni9aii/AutoDev.git
 cd AutoDev
 
-# Build
+# Build Rust binaries (optional but recommended)
 cargo build --release
 
-# Install binaries to PATH
+# Install to PATH
 cargo install --path .
 ```
 
 ## Requirements
 
-- Rust 1.70+
-- Claude Code CLI (`npm install -g @anthropic-ai/claude-code`)
+- Rust 1.70+ (for binaries)
+- Hermes Agent (for orchestration)
 - GitHub PAT (for CI checks and releases)
-
-## Usage
-
-### Full pipeline
-
-```bash
-run-pipeline /path/to/project full
-```
-
-### Review only
-
-```bash
-run-pipeline /path/to/project review
-```
-
-### Review + planning
-
-```bash
-run-pipeline /path/to/project plan
-```
-
-### Release
-
-```bash
-run-pipeline /path/to/project release --version v0.2.0
-```
 
 ## Environment Variables
 
@@ -89,39 +153,6 @@ run-pipeline /path/to/project release --version v0.2.0
 ├── CHANGELOG.md
 └── LICENSE
 ```
-
-## Pipeline Phases
-
-### Phase 1 — Review
-
-Launches 4 reviewers via Claude Code in parallel (3 at a time due to concurrency limits). Each reviewer produces a markdown report with findings classified as CRITICAL / IMPORTANT / MINOR.
-
-Reviewers use **structured file discovery** to avoid context overflow:
-1. List project structure via `search_files`
-2. Search for relevant patterns (hotspots)
-3. Read only matching files
-
-### Phase 2 — Aggregate
-
-The `review-aggregator` binary collects all findings, deduplicates, classifies as Do Now / Defer, and writes a fix plan in markdown.
-
-### Phase 3 — Execute
-
-For each Do Now item:
-- Simple fixes (≤2 files, ≤20 lines) → Hermes applies directly
-- Complex tasks → delegated to Claude Code print mode
-
-### Phase 4 — Verify
-
-Runs local tests and checks CI status. Fails if tests don't pass.
-
-### Phase 5 — Release
-
-Runs verify first, then:
-1. Builds release binary (`cargo build --release`)
-2. Creates annotated git tag
-3. Pushes tag to origin
-4. Creates GitHub Release via API
 
 ## License
 
