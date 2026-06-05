@@ -688,3 +688,31 @@ fn main() -> Result<()> {
     pipeline.run()?;
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_phase_display() {
+        assert_eq!(Phase::Full.to_string(), "full");
+        assert_eq!(Phase::Review.to_string(), "review");
+        assert_eq!(Phase::Plan.to_string(), "plan");
+        assert_eq!(Phase::Release.to_string(), "release");
+    }
+
+    #[test]
+    fn test_validate_version_accepts_valid() {
+        assert!(auto_dev_pipeline::validation::validate_version("v1.0.0").is_ok());
+        assert!(auto_dev_pipeline::validation::validate_version("1.0.0").is_ok());
+        assert!(auto_dev_pipeline::validation::validate_version("v2.0.0-alpha").is_ok());
+    }
+
+    #[test]
+    fn test_validate_version_rejects_invalid() {
+        assert!(auto_dev_pipeline::validation::validate_version("").is_err());
+        assert!(auto_dev_pipeline::validation::validate_version("not-a-version").is_err());
+        assert!(auto_dev_pipeline::validation::validate_version("1.0").is_err());
+        assert!(auto_dev_pipeline::validation::validate_version("-v1.0.0").is_err());
+    }
+}
