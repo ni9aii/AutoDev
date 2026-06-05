@@ -452,7 +452,9 @@ impl Pipeline {
                         .trim_matches('`')
                         .to_string();
                     fix.file = Some(file_str);
-                } else if !trimmed.starts_with("**") && !trimmed.is_empty() && trimmed != "**Description:**" {
+                } else if trimmed == "**Description:**" {
+                    // Skip the label itself, next lines go to description
+                } else if !trimmed.is_empty() {
                     fix.description.push_str(line);
                     fix.description.push('\n');
                 }
