@@ -83,11 +83,11 @@ fn parse_review_file(filepath: &Path) -> Result<Vec<Finding>> {
     let content = fs::read_to_string(filepath)?;
     let mut findings = Vec::new();
 
-    // Extract reviewer role from filename
+    // Extract reviewer role from filename (e.g., "code-review.md" -> "code")
     let role = filepath
         .file_stem()
         .and_then(|s| s.to_str())
-        .and_then(|s| s.split('-').nth_back(2))
+        .map(|s| s.trim_end_matches("-review"))
         .unwrap_or("unknown")
         .to_string();
 

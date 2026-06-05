@@ -514,7 +514,14 @@ impl Pipeline {
         // Create git tag
         log::log(&format!("Creating tag: {}", version));
         let tag_output = Command::new("git")
-            .args(["tag", "-a", version, "-m", &format!("Release {}", version)])
+            .args([
+                "tag",
+                "-a",
+                "--",
+                version,
+                "-m",
+                &format!("Release {}", version),
+            ])
             .current_dir(&self.project_path)
             .output()
             .context("Failed to create git tag")?;
