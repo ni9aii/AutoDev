@@ -32,7 +32,7 @@ impl std::fmt::Display for Phase {
 /// Auto-Dev Pipeline Entry Point
 /// Orchestrates: review → aggregate → execute → verify
 #[derive(Parser, Debug)]
-#[command(name = "run-pipeline", version = "1.0.0", about = "Auto-Dev Pipeline")]
+#[command(name = "run-pipeline", version = "1.1.0", about = "Auto-Dev Pipeline")]
 struct Args {
     /// Project path
     #[arg(default_value = ".")]
@@ -45,12 +45,22 @@ struct Args {
     /// Version tag for release (e.g., v0.2.0)
     #[arg(short, long)]
     version: Option<String>,
+
+    /// Hermes mode: use delegate_task instead of Claude CLI
+    #[arg(long, default_value = "false")]
+    hermes_mode: bool,
+
+    /// Project name for dev-notes path construction
+    #[arg(long)]
+    project: Option<String>,
 }
 
 struct Pipeline {
     project_path: PathBuf,
     phase: Phase,
     version: Option<String>,
+    hermes_mode: bool,
+    project_name: Option<String>,
     timestamp: String,
     output_dir: PathBuf,
 }
@@ -66,9 +76,23 @@ struct Fix {
 impl Pipeline {
     fn new(args: Args) -> Result<Self> {
         let timestamp = chrono::Local::now().format("%Y%m%d_%H%M%S").to_string();
-        let output_dir = dirs::home_dir()
-            .unwrap_or_else(|| PathBuf::from("."))
-            .join(".hermes/plans/auto-dev");
+        let output_dir = if args.hermes_mode {
+            let project = args.project.clone()
+                .or_else(|| args.project_path.file_name()
+                    .and_then(|n| n.to_str())
+                    .map(|s| s.to_string()))
+                .unwrap_or_else(|| "unknown".to_string());
+            dirs::home_dir()
+                .unwrap_or_else(|| PathBuf::from("."))
+                .join("dev-notes")
+                .join(project)
+                .join("reviews")
+                .join(&timestamp)
+        } else {
+            dirs::home_dir()
+                .unwrap_or_else(|| PathBuf::from("."))
+                .join(".hermes/plans/auto-dev")
+        };
 
         std::fs::create_dir_all(&output_dir)?;
 
@@ -76,6 +100,8 @@ impl Pipeline {
             project_path: args.project_path,
             phase: args.phase,
             version: args.version,
+            hermes_mode: args.hermes_mode,
+            project_name: args.project,
             timestamp,
             output_dir,
         })
@@ -90,13 +116,17 @@ impl Pipeline {
             anyhow::bail!("Not a git repository: {}", self.project_path.display());
         }
 
-        // Check Claude Code CLI
-        match Command::new("claude").arg("--version").output() {
-            Ok(_) => log::log("Claude Code CLI: found"),
-            Err(_) => {
-                log::warn("Claude Code CLI not found. Install: npm install -g @anthropic-ai/claude-code");
-                log::warn("Falling back to manual execution mode.");
+        if !self.hermes_mode {
+            // Check Claude Code CLI (legacy mode only)
+            match Command::new("claude").arg("--version").output() {
+                Ok(_) => log::log("Claude Code CLI: found"),
+                Err(_) => {
+                    log::warn("Claude Code CLI not found. Install: npm install -g @anthropic-ai/claude-code");
+                    log::warn("Consider using --hermes-mode for delegate_task-based execution.");
+                }
             }
+        } else {
+            log::log("Hermes mode: skipping Claude Code CLI check");
         }
 
         log::success("Prerequisites OK");
@@ -104,8 +134,55 @@ impl Pipeline {
     }
 
     fn run_review_phase(&self) -> Result<PathBuf> {
-        log::log("=== PHASE 1: REVIEW ===");
-        log::log("Launching 4 reviewers via Claude Code...");
+        if self.hermes_mode {
+            self.run_review_phase_hermes()
+        } else {
+            self.run_review_phase_legacy()
+        }
+    }
+
+    /// Hermes mode: print delegate_task instructions instead of calling Claude CLI
+    fn run_review_phase_hermes(&self) -> Result<PathBuf> {
+        log::log("=== PHASE 1: REVIEW (Hermes Mode) ===");
+        log::log("In Hermes mode, reviews are performed by delegate_task subagents.");
+        log::log("Run the following 4 delegate_task calls (3 at a time max):");
+        println!();
+
+        let project_name = self.project_name.clone()
+            .or_else(|| self.project_path.file_name()
+                .and_then(|n| n.to_str())
+                .map(|s| s.to_string()))
+            .unwrap_or_else(|| "unknown".to_string());
+
+        let review_dir = self.output_dir.clone();
+
+        let reviewers = [
+            ("code", "Code Reviewer: check logic, style, idioms, performance"),
+            ("security", "Security Reviewer: check vulnerabilities, unsafe code, secrets"),
+            ("architecture", "Architecture Reviewer: check structure, coupling, patterns"),
+            ("devops", "DevOps Reviewer: check CI/CD, dependencies, build, deploy"),
+        ];
+
+        for (name, prompt) in &reviewers {
+            let output_path = review_dir.join(format!("{}-review.md", name));
+            println!("--- {} Reviewer ---", name);
+            println!("delegate_task(");
+            println!("    goal=\"{}\",", prompt);
+            println!("    context=\"\"\"");
+            println!("    PROJECT_PATH: {}", self.project_path.display());
+            println!("    OUTPUT_PATH: {}", output_path.display());
+            println!("    \"\"\",");
+            println!("    toolsets=['file', 'search_files', 'terminal']");
+            println!(")");
+            println!();
+        }
+
+        log::success(&format!("Review instructions generated. Output dir: {}", review_dir.display()));
+        Ok(review_dir)
+    }
+
+    /// Legacy mode: launch reviewers via Claude Code CLI
+    fn run_review_phase_legacy(&self) -> Result<PathBuf> {
 
         let review_dir = self.output_dir.join(format!("{}-reviews", self.timestamp));
         std::fs::create_dir_all(&review_dir)?;
@@ -169,14 +246,35 @@ impl Pipeline {
     fn run_aggregate_phase(&self, review_dir: &PathBuf) -> Result<PathBuf> {
         log::log("=== PHASE 2: AGGREGATE ===");
 
-        let plan_path = self.output_dir.join(format!("{}-plan.md", self.timestamp));
+        let plan_path = if self.hermes_mode {
+            let project_name = self.project_name.clone()
+                .or_else(|| self.project_path.file_name()
+                    .and_then(|n| n.to_str())
+                    .map(|s| s.to_string()))
+                .unwrap_or_else(|| "unknown".to_string());
+            let plans_dir = dirs::home_dir()
+                .unwrap_or_else(|| PathBuf::from("."))
+                .join("dev-notes")
+                .join(&project_name)
+                .join("plans");
+            std::fs::create_dir_all(&plans_dir)?;
+            plans_dir.join(format!("{}-plan.md", self.timestamp))
+        } else {
+            self.output_dir.join(format!("{}-plan.md", self.timestamp))
+        };
 
-        let output = Command::new("review-aggregator")
-            .arg("--input-dir")
-            .arg(review_dir)
-            .arg("--output")
-            .arg(&plan_path)
-            .output()
+        let mut cmd = Command::new("review-aggregator");
+        cmd.arg("--input-dir").arg(review_dir);
+        cmd.arg("--output").arg(&plan_path);
+
+        if self.hermes_mode {
+            if let Some(ref project) = self.project_name {
+                cmd.arg("--project").arg(project);
+            }
+            cmd.arg("--dev-notes");
+        }
+
+        let output = cmd.output()
             .context("Failed to run review-aggregator")?;
 
         if !output.status.success() {
@@ -198,7 +296,73 @@ impl Pipeline {
     }
 
     fn run_execute_phase(&self, plan_path: &PathBuf) -> Result<()> {
-        log::log("=== PHASE 3: EXECUTE ===");
+        if self.hermes_mode {
+            self.run_execute_phase_hermes(plan_path)
+        } else {
+            self.run_execute_phase_legacy(plan_path)
+        }
+    }
+
+    /// Hermes mode: print fix instructions instead of calling Claude CLI
+    fn run_execute_phase_hermes(&self, plan_path: &PathBuf) -> Result<()> {
+        log::log("=== PHASE 3: EXECUTE (Hermes Mode) ===");
+
+        let plan_content = std::fs::read_to_string(plan_path)
+            .context("Failed to read plan file")?;
+
+        let do_now_section = markdown::extract_section(&plan_content, "Do Now");
+        if do_now_section.is_empty() {
+            log::warn("No Do Now fixes found in plan");
+            return Ok(());
+        }
+
+        log::log(&format!("Found Do Now section ({} chars)", do_now_section.len()));
+
+        let fixes = self.parse_fixes(&do_now_section);
+        log::log(&format!("Parsed {} fixes to execute", fixes.len()));
+
+        if fixes.is_empty() {
+            log::warn("No actionable fixes found");
+            return Ok(());
+        }
+
+        println!();
+        println!("=== Hermes Execute Instructions ===");
+        println!("For each fix below, use delegate_task (complex) or patch (simple):");
+        println!();
+
+        for (i, fix) in fixes.iter().enumerate() {
+            println!("--- Fix {}: {} ---", i + 1, fix.title);
+            println!("Severity: {}", fix.severity);
+            if let Some(ref file) = fix.file {
+                println!("File: {}", file);
+            }
+            println!();
+            println!("Option A - Simple fix (≤2 files, ≤20 lines):");
+            println!("  read_file(path=\"...\")");
+            println!("  patch(path=\"...\", old_string=\"...\", new_string=\"...\")");
+            println!();
+            println!("Option B - Complex fix:");
+            println!("  delegate_task(");
+            println!("      goal=\"Fix: {}\",", fix.title);
+            println!("      context=\"\"\"");
+            println!("      PROJECT_PATH: {}", self.project_path.display());
+            if let Some(ref file) = fix.file {
+                println!("      FILE: {}", file);
+            }
+            println!("      DESCRIPTION: {}", fix.description.trim());
+            println!("      \"\"\",");
+            println!("      toolsets=['file', 'patch', 'terminal']");
+            println!("  )");
+            println!();
+        }
+
+        log::success("Execution instructions generated");
+        Ok(())
+    }
+
+    /// Legacy mode: execute fixes via Claude Code CLI
+    fn run_execute_phase_legacy(&self, plan_path: &PathBuf) -> Result<()> {
 
         let plan_content = std::fs::read_to_string(plan_path)
             .context("Failed to read plan file")?;
@@ -421,9 +585,17 @@ impl Pipeline {
 
         // Check CI status
         log::log("Checking CI status...");
-        let ci_output = Command::new("ci-check")
-            .arg(&self.project_path)
-            .output()
+        let mut cmd = Command::new("ci-check");
+        cmd.arg(&self.project_path);
+
+        if self.hermes_mode {
+            if let Some(ref project) = self.project_name {
+                cmd.arg("--project").arg(project);
+            }
+            cmd.arg("--dev-notes");
+        }
+
+        let ci_output = cmd.output()
             .context("Failed to run ci-check")?;
 
         if !ci_output.status.success() {
@@ -465,9 +637,10 @@ impl Pipeline {
     }
 
     fn run(&self) -> Result<()> {
-        log::log("Auto-Dev Pipeline v1.0.0 (Rust)");
+        log::log("Auto-Dev Pipeline v1.1.0 (Rust)");
         log::log(&format!("Project: {}", self.project_path.display()));
         log::log(&format!("Phase: {}", self.phase));
+        log::log(&format!("Mode: {}", if self.hermes_mode { "Hermes (delegate_task)" } else { "Legacy (Claude CLI)" }));
         log::log(&format!("Output: {}", self.output_dir.display()));
 
         self.check_prerequisites()?;
