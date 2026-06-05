@@ -144,7 +144,8 @@ pub mod validation {
             return Err("Version string is empty".to_string());
         }
         // Allow v-prefixed semver: v0.1.0, 1.0.0, v2.0.0-alpha
-        let re = regex::Regex::new(r"^v?\d+\.\d+\.\d+(-[a-zA-Z0-9.]+)?$").unwrap();
+        let re = regex::Regex::new(r"^v?\d+\.\d+\.\d+(-[a-zA-Z0-9.]+)?$")
+            .map_err(|e| format!("Failed to compile version regex: {}", e))?;
         if !re.is_match(clean) {
             return Err(format!(
                 "Invalid version '{}'. Expected semver format: v0.1.0 or 1.0.0",
