@@ -130,6 +130,24 @@ pub mod git {
     use std::path::Path;
     use std::process::Command;
 
+    pub mod paths {
+        use anyhow::{Context, Result};
+        use std::path::Path;
+
+        /// Validate and canonicalize a project path
+        /// Returns Ok(canonical_path) or Err with descriptive message
+        pub fn validate_project_path(path: &Path) -> Result<std::path::PathBuf> {
+            let canonical = std::fs::canonicalize(path)
+                .with_context(|| format!("Invalid project path: {}", path.display()))?;
+
+            if !canonical.join(".git").exists() && !canonical.join("Cargo.toml").exists() {
+                anyhow::bail!("Not a project directory (missing .git or Cargo.toml): {}", canonical.display());
+            }
+
+            Ok(canonical)
+        }
+    }
+
     static GITHUB_REMOTE_RE: Lazy<Regex> = Lazy::new(|| {
         Regex::new(r"github\.com[:/]([^/]+)/([^/]+?)(?:\.git)?$")
             .expect("Invalid GITHUB_REMOTE_RE pattern")

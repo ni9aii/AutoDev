@@ -11,22 +11,18 @@ env:
 
 jobs:
   test:
-    name: Build & Test (Arch Linux)
+    name: Build & Test (Ubuntu)
     runs-on: ubuntu-latest
-    container:
-      image: archlinux:latest
 
     steps:
       - uses: actions/checkout@v4
-
-      - name: Install dependencies
-        run: pacman -Syu --noconfirm curl base-devel
 
       - name: Cache cargo registry
         uses: actions/cache@v4
         with:
           path: |
             ~/.cargo/registry
+            ~/.cargo/git
             ~/.cargo/index
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: |
@@ -65,7 +61,7 @@ jobs:
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: autodev-arch
+          name: autodev
           path: |
             target/release/run-pipeline
             target/release/ci-check
