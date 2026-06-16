@@ -49,10 +49,14 @@ struct Args {
     #[arg(long)]
     project: Option<String>,
 
-    /// Auto-construct dev-notes paths: read from ~/dev-notes/<project>/reviews/<timestamp>/
-    /// and write to ~/dev-notes/<project>/plans/<timestamp>-plan.md
+    /// Auto-construct dev-notes paths: read from <root>/<project>/reviews/<timestamp>/
+    /// and write to <root>/<project>/plans/<timestamp>-plan.md
     #[arg(long, default_value = "false")]
     dev_notes: bool,
+
+    /// Root directory for dev-notes (overrides $DEV_NOTES_ROOT and ~/dev-notes default)
+    #[arg(long)]
+    dev_notes_root: Option<PathBuf>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -282,6 +286,18 @@ fn generate_plan(findings: &[Finding], output_path: &Path) -> Result<()> {
     Ok(())
 }
 
+/// Resolve dev-notes root: --dev-notes-root > $DEV_NOTES_ROOT > ~/dev-notes
+fn resolve_dev_notes_root(override_path: Option<&PathBuf>) -> Result<PathBuf> {
+    if let Some(p) = override_path {
+        return Ok(p.clone());
+    }
+    if let Ok(env_root) = std::env::var("DEV_NOTES_ROOT") {
+        return Ok(PathBuf::from(env_root));
+    }
+    let home = dirs::home_dir().context("Could not determine home directory")?;
+    Ok(home.join("dev-notes"))
+}
+
 fn main() -> Result<()> {
     let args = Args::parse();
 
@@ -290,8 +306,8 @@ fn main() -> Result<()> {
         let project = args.project.as_ref().context(
             "--project is required when --dev-notes is enabled"
         )?;
-        let home = dirs::home_dir().context("Could not determine home directory")?;
-        let reviews_dir = home.join("dev-notes").join(project).join("reviews");
+        let root = resolve_dev_notes_root(args.dev_notes_root.as_ref())?;
+        let reviews_dir = root.join(project).join("reviews");
 
         // Find the most recent timestamp directory
         let latest_dir = fs::read_dir(&reviews_dir)
@@ -309,7 +325,7 @@ fn main() -> Result<()> {
             .file_name()
             .and_then(|n| n.to_str())
             .unwrap_or("unknown");
-        let plans_dir = home.join("dev-notes").join(project).join("plans");
+        let plans_dir = root.join(project).join("plans");
         fs::create_dir_all(&plans_dir)?;
         let output_path = plans_dir.join(format!("{}-plan.md", timestamp));
 

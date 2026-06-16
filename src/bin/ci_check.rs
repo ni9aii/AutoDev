@@ -20,6 +20,10 @@ struct Args {
     /// Project name for dev-notes path (defaults to repo name)
     #[arg(long)]
     project: Option<String>,
+
+    /// Root directory for dev-notes (overrides $DEV_NOTES_ROOT and ~/dev-notes default)
+    #[arg(long)]
+    dev_notes_root: Option<PathBuf>,
 }
 
 struct CiChecker {
@@ -190,7 +194,8 @@ impl CiChecker {
             });
 
             if let Some(project) = project_name {
-                if let Err(e) = self.save_dev_notes_report(&project, ci_passed, local_passed) {
+                let root = resolve_dev_notes_root(args.dev_notes_root.as_ref())?;
+                if let Err(e) = self.save_dev_notes_report(&project, ci_passed, local_passed, &root) {
                     log::warn(&format!("Failed to save dev-notes report: {}", e));
                 }
             } else {
@@ -228,9 +233,9 @@ impl CiChecker {
         project: &str,
         ci_passed: bool,
         local_passed: bool,
+        root: &std::path::Path,
     ) -> Result<()> {
-        let home = dirs::home_dir().context("Could not determine home directory")?;
-        let reports_dir = home.join("dev-notes").join(project).join("ci-reports");
+        let reports_dir = root.join(project).join("ci-reports");
         fs::create_dir_all(&reports_dir)?;
 
         let timestamp = chrono::Local::now().format("%Y%m%d_%H%M%S");
@@ -266,6 +271,18 @@ impl CiChecker {
         log::log(&format!("CI report saved: {}", report_path.display()));
         Ok(())
     }
+}
+
+/// Resolve dev-notes root: --dev-notes-root > $DEV_NOTES_ROOT > ~/dev-notes
+fn resolve_dev_notes_root(override_path: Option<&PathBuf>) -> Result<PathBuf> {
+    if let Some(p) = override_path {
+        return Ok(p.clone());
+    }
+    if let Ok(env_root) = std::env::var("DEV_NOTES_ROOT") {
+        return Ok(PathBuf::from(env_root));
+    }
+    let home = dirs::home_dir().context("Could not determine home directory")?;
+    Ok(home.join("dev-notes"))
 }
 
 fn main() -> Result<()> {
