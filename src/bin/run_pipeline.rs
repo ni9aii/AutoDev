@@ -53,6 +53,10 @@ struct Args {
     /// Project name for dev-notes path construction
     #[arg(long)]
     project: Option<String>,
+
+    /// Root directory for dev-notes (overrides $DEV_NOTES_ROOT and ~/dev-notes default)
+    #[arg(long)]
+    dev_notes_root: Option<PathBuf>,
 }
 
 struct Pipeline {
@@ -63,6 +67,19 @@ struct Pipeline {
     project_name: Option<String>,
     timestamp: String,
     output_dir: PathBuf,
+    dev_notes_root: PathBuf,
+}
+
+/// Resolve dev-notes root: --dev-notes-root > $DEV_NOTES_ROOT > ~/dev-notes
+fn resolve_dev_notes_root(override_path: Option<&PathBuf>) -> Result<PathBuf> {
+    if let Some(p) = override_path {
+        return Ok(p.clone());
+    }
+    if let Ok(env_root) = std::env::var("DEV_NOTES_ROOT") {
+        return Ok(PathBuf::from(env_root));
+    }
+    let home = dirs::home_dir().context("Could not determine home directory")?;
+    Ok(home.join("dev-notes"))
 }
 
 /// Individual fix parsed from Do Now section
@@ -81,15 +98,15 @@ impl Pipeline {
         let project_path = std::fs::canonicalize(&args.project_path)
             .with_context(|| format!("Invalid project path: {}", args.project_path.display()))?;
 
+        let dev_notes_root = resolve_dev_notes_root(args.dev_notes_root.as_ref())?;
+
         let output_dir = if args.hermes_mode {
             let project = args.project.clone()
                 .or_else(|| project_path.file_name()
                     .and_then(|n| n.to_str())
                     .map(|s| s.to_string()))
                 .unwrap_or_else(|| "unknown".to_string());
-            dirs::home_dir()
-                .unwrap_or_else(|| PathBuf::from("."))
-                .join("dev-notes")
+            dev_notes_root
                 .join(project)
                 .join("reviews")
                 .join(&timestamp)
@@ -109,6 +126,7 @@ impl Pipeline {
             project_name: args.project,
             timestamp,
             output_dir,
+            dev_notes_root,
         })
     }
 
@@ -257,11 +275,7 @@ impl Pipeline {
                     .and_then(|n| n.to_str())
                     .map(|s| s.to_string()))
                 .unwrap_or_else(|| "unknown".to_string());
-            let plans_dir = dirs::home_dir()
-                .unwrap_or_else(|| PathBuf::from("."))
-                .join("dev-notes")
-                .join(&project_name)
-                .join("plans");
+            let plans_dir = self.dev_notes_root.join(&project_name).join("plans");
             std::fs::create_dir_all(&plans_dir)?;
             plans_dir.join(format!("{}-plan.md", self.timestamp))
         } else {
@@ -277,6 +291,7 @@ impl Pipeline {
                 cmd.arg("--project").arg(project);
             }
             cmd.arg("--dev-notes");
+            cmd.arg("--dev-notes-root").arg(&self.dev_notes_root);
         }
 
         let output = cmd.output()
