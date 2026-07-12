@@ -2,6 +2,10 @@
 
 Automated development pipeline: parallel review → aggregate → execute → verify.
 
+> Canonical conventions (paths, invocation, config) are declared in the repo
+> root `SKILL.md` / `README.md` (`ni9aii/AutoDev`) — keep this skill in sync
+> with that doc.
+
 ## Invocation
 
 ```

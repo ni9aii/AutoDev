@@ -22,7 +22,7 @@ delegate_task(
     
     Read the source files, analyze for bugs/style/edge cases/tests.
     Output findings in the format specified in the prompt.
-    Save report to: ~/dev-notes/<project>/reviews/YYYY-MM-DD-code-review-report.md
+    Save report to: $DEV_NOTES_ROOT/<project>/reviews/YYYY-MM-DD-code-review-report.md
     """,
     toolsets=['file', 'search_files']
 )
@@ -57,8 +57,8 @@ After all 4 subagents complete, run `review-aggregator`:
 
 ```bash
 review-aggregator \
-    --input-dir ~/dev-notes/<project>/reviews/ \
-    --output ~/dev-notes/<project>/plans/YYYY-MM-DD-plan.md
+    --input-dir $DEV_NOTES_ROOT/<project>/reviews/ \
+    --output $DEV_NOTES_ROOT/<project>/plans/YYYY-MM-DD-plan.md
 ```
 
 The aggregator:
@@ -147,7 +147,7 @@ else:
 ## User Preference Notes
 
 - User prefers "строго по одному пункту" execution (one task at a time)
-- User wants reports saved to dev-notes repo (~/dev-notes/<project>/reviews/ and ~/dev-notes/<project>/plans/)
+- User wants reports saved to dev-notes repo ($DEV_NOTES_ROOT/<project>/reviews/ and $DEV_NOTES_ROOT/<project>/plans/)
 - User uses Claude Code for all delegation (not Kimi CLI)
 - User splits by role: Hermes = planning/decisions, Claude Code = execution
 - Max iterations should be configurable (default: 5)

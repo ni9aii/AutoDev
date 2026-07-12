@@ -56,13 +56,13 @@ delegate_task(
     goal="Code Reviewer: check logic, style, idioms, performance",
     context="""
     PROJECT_PATH: /path/to/project
-    OUTPUT_PATH: ~/dev-notes/myproject/reviews/20260606_143022/code-review.md
+    OUTPUT_PATH: $DEV_NOTES_ROOT/myproject/reviews/20260606_143022/code-review.md
     """,
     toolsets=['file', 'search_files', 'terminal']
 )
 ```
 
-Reports saved to `~/dev-notes/<project>/reviews/<timestamp>/`.
+Reports saved to `$DEV_NOTES_ROOT/<project>/reviews/<timestamp>/`.
 
 ### Phase 2 — Aggregate
 
@@ -70,7 +70,7 @@ Reports saved to `~/dev-notes/<project>/reviews/<timestamp>/`.
 review-aggregator --dev-notes --project myproject
 ```
 
-Auto-discovers latest reviews, generates plan at `~/dev-notes/<project>/plans/<timestamp>-plan.md`.
+Auto-discovers latest reviews, generates plan at `$DEV_NOTES_ROOT/<project>/plans/<timestamp>-plan.md`.
 
 ### Phase 3 — Execute
 
@@ -84,7 +84,7 @@ Hermes mode prints per-fix instructions:
 ci-check /path/to/project --dev-notes --project myproject
 ```
 
-Saves report to `~/dev-notes/<project>/ci-reports/<timestamp>-ci-status.md`.
+Saves report to `$DEV_NOTES_ROOT/<project>/ci-reports/<timestamp>-ci-status.md`.
 
 ### Phase 5 — Release
 
@@ -94,8 +94,11 @@ run-pipeline /path/to/project release --version v0.2.0
 
 ## Directory Layout (dev-notes)
 
+`$DEV_NOTES_ROOT` defaults to `~/obsidian-vault/dev-notes` (override via
+`--dev-notes-root` or the `DEV_NOTES_ROOT` env var):
+
 ```
-~/dev-notes/
+$DEV_NOTES_ROOT/
 └── <project>/
     ├── reviews/
     │   └── YYYYMMDD_HHMMSS/
@@ -135,6 +138,7 @@ cargo install --path .
 |----------|-------------|
 | `GITHUB_TOKEN` / `GITHUB_PAT` | GitHub API authentication |
 | `AUTO_DEV_VERSION` | Fallback version for release phase |
+| `DEV_NOTES_ROOT` | Root for `--dev-notes` paths (default: `~/obsidian-vault/dev-notes`) |
 
 ## Project Structure
 
