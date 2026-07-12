@@ -167,12 +167,27 @@ pub mod git {
         let remote_url = String::from_utf8_lossy(&output.stdout).trim().to_string();
 
         if let Some(caps) = GITHUB_REMOTE_RE.captures(&remote_url) {
-            let owner = &caps[1];
-            let repo = &caps[2];
+            let owner = caps[1].trim();
+            let repo = caps[2].trim();
+            validate_github_slug(owner)?;
+            validate_github_slug(repo)?;
             Ok(format!("{}/{}", owner, repo))
         } else {
             anyhow::bail!("Not a GitHub repository: {}", remote_url)
         }
+    }
+
+    fn validate_github_slug(slug: &str) -> Result<()> {
+        // GitHub username/repo names: alphanumeric, hyphens, underscores, dots
+        // Cannot start/end with hyphen, cannot be empty, max 39 chars for users
+        static SLUG_RE: Lazy<Regex> = Lazy::new(|| {
+            Regex::new(r"^[a-zA-Z0-9_.-]+$")
+                .expect("Invalid SLUG_RE pattern")
+        });
+        if slug.is_empty() || slug.len() > 100 || !SLUG_RE.is_match(slug) {
+            anyhow::bail!("Invalid GitHub slug: '{}'", slug);
+        }
+        Ok(())
     }
 }
 

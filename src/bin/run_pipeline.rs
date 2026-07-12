@@ -575,7 +575,9 @@ impl Pipeline {
             .or_else(|_| std::env::var("GITHUB_PAT"))
             .context("GITHUB_TOKEN or GITHUB_PAT must be set")?;
 
-        let release_url = format!("https://api.github.com/repos/{}/releases", repo);
+        let release_url = url::Url::parse("https://api.github.com/repos/")
+            .and_then(|base| base.join(&format!("{}/releases/", repo)))
+            .context("Failed to build GitHub release URL")?;
         let release_body = format!(
             "{{\"tag_name\":\"{}\",\"name\":\"Release {}\",\"body\":\"Auto-generated release\",\"draft\":false,\"prerelease\":false}}",
             version, version
@@ -586,7 +588,7 @@ impl Pipeline {
             .build()
             .context("Failed to create HTTP client")?;
         let response = client
-            .post(&release_url)
+            .post(release_url)
             .header("Accept", "application/vnd.github+json")
             .bearer_auth(token)
             .header("User-Agent", "auto-dev-pipeline/1.0")
