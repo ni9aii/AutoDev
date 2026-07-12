@@ -539,7 +539,6 @@ impl Pipeline {
             .args([
                 "tag",
                 "-a",
-                "--",
                 version,
                 "-m",
                 &format!("Release {}", version),
