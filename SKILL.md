@@ -2,10 +2,18 @@
 
 This document describes the AutoDev project structure and its components.
 
-For the Hermes skill that orchestrates the pipeline, see:
-`~/.hermes/skills/autonomous-ai-agents/autodev/SKILL.md`
+## Source of Truth
 
-Load with: `/skill autodev`
+This repository (`ni9aii/AutoDev`) is the canonical source for AutoDev pipeline
+conventions: paths, invocation, and configuration. Other skill surfaces must
+follow what's documented here:
+
+- **Claude Code skill** — `skills/claude-code/SKILL.md` (in this repo)
+- **Hermes skill** — `~/.hermes/skills/autonomous-ai-agents/autodev/SKILL.md`
+  (lives in the separate `~/.hermes` repo, but its config/paths must match
+  this doc)
+
+Load the Hermes skill with: `/skill autodev`
 
 ## What Is This
 
@@ -92,6 +100,7 @@ review-aggregator --dev-notes --project myproject
 |----------|----------|---------|
 | `GITHUB_TOKEN` or `GITHUB_PAT` | For CI check and releases | GitHub API authentication |
 | `AUTO_DEV_VERSION` | Optional | Fallback version for release phase |
+| `DEV_NOTES_ROOT` | Optional | Root for `--dev-notes` paths (default: `~/obsidian-vault/dev-notes`; overridable via `--dev-notes-root`) |
 
 ## Project Structure
 
@@ -124,10 +133,11 @@ Pipeline: `cargo test` → `cargo clippy -- -D warnings` → `cargo build --rele
 
 ## dev-notes Integration
 
-When using `--dev-notes` flag:
+When using `--dev-notes` flag, reports are written under `$DEV_NOTES_ROOT`
+(default `~/obsidian-vault/dev-notes`, overridable via `--dev-notes-root`):
 
 ```
-~/dev-notes/
+$DEV_NOTES_ROOT/
 └── <project>/
     ├── reviews/
     │   └── YYYYMMDD_HHMMSS/

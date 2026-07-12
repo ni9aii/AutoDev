@@ -1,5 +1,19 @@
 # Changelog
 
+## [Unreleased]
+
+### Changed
+- Docs reconciliation: `ni9aii/AutoDev` declared single source of truth for
+  pipeline conventions (paths, invocation, config). Replaced hardcoded
+  `~/dev-notes` example paths with `$DEV_NOTES_ROOT` (canonical default:
+  `~/obsidian-vault/dev-notes`) in `SKILL.md`, `README.md`, and
+  `references/hermes-delegate-task-integration.md`. Added a "Source of Truth"
+  section to root `SKILL.md` and a pointer note in
+  `skills/claude-code/SKILL.md`. The Hermes skill
+  (`~/.hermes/skills/autonomous-ai-agents/autodev/SKILL.md`, separate repo)
+  updated to match and to reference this repo as canonical. No runtime
+  behavior changes — Rust binaries' fallback default is unchanged.
+
 ## [0.3.0] - 2026-05-15
 
 ### Fixed (CRITICAL)
