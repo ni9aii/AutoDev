@@ -182,6 +182,30 @@ fn classify_finding(severity: &str, file: &Option<String>, body: &str) -> String
     }
 }
 
+/// Normalized key used to detect the same finding reported by multiple reviewers.
+fn dedup_key(finding: &Finding) -> String {
+    format!(
+        "{}|{}|{}",
+        finding.severity.trim().to_lowercase(),
+        finding.title.trim().to_lowercase(),
+        finding
+            .file
+            .as_deref()
+            .unwrap_or("")
+            .trim()
+            .to_lowercase()
+    )
+}
+
+/// Removes findings that share a severity+title+file key, keeping the first occurrence.
+fn dedup_findings(findings: Vec<Finding>) -> Vec<Finding> {
+    let mut seen = std::collections::HashSet::new();
+    findings
+        .into_iter()
+        .filter(|f| seen.insert(dedup_key(f)))
+        .collect()
+}
+
 fn prioritize_findings(findings: &[Finding]) -> Vec<Finding> {
     let severity_order = |s: &str| match s {
         "CRITICAL" => 0,
@@ -366,6 +390,13 @@ fn main() -> Result<()> {
         all_findings.extend(findings);
     }
 
+    let before_dedup = all_findings.len();
+    all_findings = dedup_findings(all_findings);
+    let deduped = before_dedup - all_findings.len();
+    if deduped > 0 {
+        eprintln!("Removed {} duplicate finding(s)", deduped);
+    }
+
     if all_findings.is_empty() {
         eprintln!("No findings found. Generating empty plan.");
     }
@@ -387,4 +418,52 @@ fn main() -> Result<()> {
     }
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn finding(role: &str, severity: &str, title: &str, file: Option<&str>) -> Finding {
+        Finding {
+            role: role.to_string(),
+            severity: severity.to_string(),
+            title: title.to_string(),
+            description: String::new(),
+            file: file.map(|f| f.to_string()),
+            line: None,
+            classification: "do_now".to_string(),
+        }
+    }
+
+    #[test]
+    fn test_dedup_removes_same_finding_from_different_reviewers() {
+        let findings = vec![
+            finding("code", "CRITICAL", "SQL injection", Some("src/db.rs")),
+            finding("security", "CRITICAL", "SQL injection", Some("src/db.rs")),
+        ];
+        let deduped = dedup_findings(findings);
+        assert_eq!(deduped.len(), 1);
+        assert_eq!(deduped[0].role, "code");
+    }
+
+    #[test]
+    fn test_dedup_keeps_distinct_findings() {
+        let findings = vec![
+            finding("code", "CRITICAL", "SQL injection", Some("src/db.rs")),
+            finding("security", "IMPORTANT", "Missing auth check", Some("src/auth.rs")),
+        ];
+        let deduped = dedup_findings(findings);
+        assert_eq!(deduped.len(), 2);
+    }
+
+    #[test]
+    fn test_dedup_key_case_and_whitespace_insensitive() {
+        let findings = vec![
+            finding("code", "CRITICAL", "  SQL Injection ", Some("src/db.rs")),
+            finding("security", "critical", "sql injection", Some("SRC/DB.RS")),
+        ];
+        let deduped = dedup_findings(findings);
+        assert_eq!(deduped.len(), 1);
+    }
 }
