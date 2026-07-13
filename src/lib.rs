@@ -667,6 +667,7 @@ mod tests {
         assert!(validation::validate_project_name("../escape").is_err());
         assert!(validation::validate_project_name("foo/bar").is_err());
         assert!(validation::validate_project_name("foo\\bar").is_err());
+        assert!(validation::validate_project_name("..\\escape").is_err());
         assert!(validation::validate_project_name("..").is_err());
         assert!(validation::validate_project_name(".").is_err());
         assert!(validation::validate_project_name("").is_err());
