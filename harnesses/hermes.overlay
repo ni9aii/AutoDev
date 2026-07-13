@@ -1,0 +1,35 @@
+@@FRONTMATTER@@
+name: autodev
+description: "AutoDev MVP: automated review → plan → execute → verify pipeline. All tasks run inside Hermes Agent via delegate_task. Rust binaries are optional accelerators."
+version: 1.0.0
+author: ni9aii
+license: MIT
+platforms: [linux, windows, macos]
+metadata:
+  hermes:
+    tags: [AutoDev, Pipeline, Review, Code-Quality, CI, Automation, Rust]
+    related_skills: [autonomous-ai-agents]
+    quick_commands:
+      - name: autodev
+        description: "Run full AutoDev pipeline on a project"
+        example: "/autodev /path/to/project"
+@@INVOKE@@
+Load the skill with `/skill autodev` (or `/autodev` if mapped as a quick
+command), then provide the project path and phase.
+@@REVIEWERS@@
+Run the four reviewers (code, security, architecture, devops) as **parallel
+`delegate_task` subagents** (one at a time if rate limits are tight). Each
+reads the sources and writes its report to:
+
+$DEV_NOTES_ROOT/<project>/reviews/<YYYY-MM-DD>-<role>-review-report.md
+
+Finding format per reviewer:
+
+### [CRITICAL] Title
+Description. File: `path/to/file.rs`. Line: 42.
+@@EXECUTE@@
+- **Simple fixes** (≤2 files, ≤20 lines): `read_file` + `patch` directly.
+- **Complex fixes**: `delegate_task` subagent.
+  Commit after each logical fix (the skill's git-sync handles push on session end).
+@@INSTALL_PATH_HINT@@
+~/.hermes/skills/autonomous-ai-agents/autodev/ (via git-sync, or copy SKILL.md there)

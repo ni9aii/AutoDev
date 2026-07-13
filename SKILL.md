@@ -136,16 +136,12 @@ Run the four reviewers (code, security, architecture, devops) with your
 harness's subagent / parallel-execution mechanism. Each reads the sources and
 writes its report to:
 
-```text
 $DEV_NOTES_ROOT/<project>/reviews/<YYYY-MM-DD>-<role>-review-report.md
-```
 
 Finding format per reviewer:
 
-```text
 ### [CRITICAL] Title
 Description. File: `path/to/file.rs`. Line: 42.
-```
 
 ### `plan` — aggregation
 
@@ -170,7 +166,7 @@ Read the latest plan from `$DEV_NOTES_ROOT/<project>/plans/`. For each fix in th
 - **Simple fixes** (≤2 files, ≤20 lines): apply directly with your harness's
   read/edit tools.
 - **Complex fixes**: delegate to a subagent.
-Commit after each logical fix.
+  Commit after each logical fix.
 
 ### `full` — full pipeline
 
@@ -230,4 +226,4 @@ $DEV_NOTES_ROOT/
 
 This skill is distributed via the repo's `install.sh` (one command, auto-detects
 your harness) or by copying the generated `SKILL.md` into your harness's skill
-directory (currently: ``).
+directory (currently: `any harness that can load SKILL.md + references/`).
