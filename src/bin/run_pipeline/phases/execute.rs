@@ -205,7 +205,8 @@ impl Pipeline {
             .context("Failed to run Claude Code")?;
 
         if !output.status.success() {
-            log::warn("Claude Code exited with non-zero status");
+            log::error("Claude Code exited with non-zero status");
+            anyhow::bail!("Claude Code execution failed");
         }
 
         let stdout = String::from_utf8_lossy(&output.stdout);
