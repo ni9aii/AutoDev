@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.4.0] (pending — no release tag yet)
+
 ### Fixed (Known Limitations from 0.3.0)
 - PATH hijack risk — all bare `Command::new("claude"/"cargo"/"git"/"gh"/...)`
   call sites replaced with a `ProcessRunner` trait (`SystemRunner` in
