@@ -18,7 +18,7 @@ impl Pipeline {
         log::log("=== PHASE 1: REVIEW (Hermes Mode) ===");
         log::log("In Hermes mode, reviews are performed by delegate_task subagents.");
         log::log("Run the following 4 delegate_task calls one at a time (sequential to avoid rate limits):");
-        println!();
+        eprintln!();
 
         let _project_name = self.project_name.clone()
             .or_else(|| self.project_path.file_name()
@@ -37,16 +37,16 @@ impl Pipeline {
 
         for (name, prompt) in &reviewers {
             let output_path = review_dir.join(format!("{}-review.md", name));
-            println!("--- {} Reviewer ---", name);
-            println!("delegate_task(");
-            println!("    goal=\"{}\",", prompt);
-            println!("    context=\"\"\"");
-            println!("    PROJECT_PATH: {}", self.project_path.display());
-            println!("    OUTPUT_PATH: {}", output_path.display());
-            println!("    \"\"\",");
-            println!("    toolsets=['file', 'search_files', 'terminal']");
-            println!(")");
-            println!();
+            eprintln!("--- {} Reviewer ---", name);
+            eprintln!("delegate_task(");
+            eprintln!("    goal=\"{}\",", prompt);
+            eprintln!("    context=\"\"\"");
+            eprintln!("    PROJECT_PATH: {}", self.project_path.display());
+            eprintln!("    OUTPUT_PATH: {}", output_path.display());
+            eprintln!("    \"\"\"");
+            eprintln!("    toolsets=['file', 'search_files', 'terminal']");
+            eprintln!(")");
+            eprintln!();
         }
 
         log::success(&format!("Review instructions generated. Output dir: {}", review_dir.display()));

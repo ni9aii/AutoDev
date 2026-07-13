@@ -2,6 +2,7 @@ use anyhow::{Context, Result};
 use auto_dev_pipeline::log;
 use auto_dev_pipeline::process::{ProcessRunner, SystemRunner};
 use clap::{Parser, ValueEnum};
+use serde::Serialize;
 use std::path::PathBuf;
 
 mod phases;
@@ -58,6 +59,10 @@ struct Args {
     /// Root directory for dev-notes (overrides $DEV_NOTES_ROOT and ~/obsidian-vault/dev-notes default)
     #[arg(long)]
     dev_notes_root: Option<PathBuf>,
+
+    /// Emit a machine-readable JSON summary instead of the human log tail
+    #[arg(long, default_value = "false")]
+    json: bool,
 }
 
 struct Pipeline {
@@ -69,6 +74,7 @@ struct Pipeline {
     timestamp: String,
     output_dir: PathBuf,
     dev_notes_root: PathBuf,
+    json: bool,
     runner: Box<dyn ProcessRunner>,
 }
 
@@ -121,6 +127,7 @@ impl Pipeline {
             timestamp,
             output_dir,
             dev_notes_root,
+            json: args.json,
             runner: Box::new(SystemRunner),
         })
     }
@@ -239,12 +246,44 @@ impl Pipeline {
             }
         }
 
-        log::success("Pipeline complete!");
-        log::log(&format!("Reports: {}", self.output_dir.display()));
+        if self.json {
+            let summary = PipelineSummary {
+                status: "success",
+                version: env!("CARGO_PKG_VERSION"),
+                project: self.project_path.display().to_string(),
+                phase: self.phase.to_string(),
+                mode: if self.hermes_mode {
+                    "hermes"
+                } else {
+                    "legacy"
+                },
+                timestamp: &self.timestamp,
+                output_dir: self.output_dir.display().to_string(),
+            };
+            println!(
+                "{}",
+                serde_json::to_string_pretty(&summary).context("serialize JSON summary")?
+            );
+        } else {
+            log::success("Pipeline complete!");
+            log::log(&format!("Reports: {}", self.output_dir.display()));
+        }
+
         Ok(())
     }
 }
 
+/// Machine-readable result of a pipeline run (emitted with `--json`).
+#[derive(Debug, Serialize)]
+struct PipelineSummary<'a> {
+    status: &'a str,
+    version: &'a str,
+    project: String,
+    phase: String,
+    mode: &'a str,
+    timestamp: &'a str,
+    output_dir: String,
+}
 fn main() -> Result<()> {
     let args = Args::parse();
     let pipeline = Pipeline::new(args)?;
