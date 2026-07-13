@@ -104,3 +104,68 @@ impl Pipeline {
         Ok(())
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use auto_dev_pipeline::process::{mock_output, MockRunner};
+    use std::path::PathBuf as StdPathBuf;
+
+    fn pipeline_with(mock: MockRunner) -> crate::Pipeline {
+        crate::Pipeline {
+            project_path: StdPathBuf::from("."),
+            phase: crate::Phase::Release,
+            version: Some("v1.2.3".to_string()),
+            hermes_mode: false,
+            project_name: None,
+            timestamp: "20260101_000000".to_string(),
+            output_dir: StdPathBuf::from("."),
+            dev_notes_root: StdPathBuf::from("."),
+            json: false,
+            runner: Box::new(mock),
+        }
+    }
+
+    #[test]
+    fn test_release_phase_rejects_bad_version() {
+        // Validation happens before any process call, so an empty MockRunner is fine.
+        let p = pipeline_with(MockRunner::new());
+        let res = p.run_release_phase("; rm -rf /");
+        assert!(res.is_err(), "malicious version must be rejected");
+        assert!(res.unwrap_err().to_string().contains("Invalid version"));
+    }
+
+    #[test]
+    fn test_release_phase_bails_when_build_fails() {
+        // First runner call is `cargo build --release`; simulate a compile failure.
+        let mock = MockRunner::new();
+        mock.push_response(mock_output(false, "", "error[E0001]: boom"));
+        let p = pipeline_with(mock);
+        let res = p.run_release_phase("v1.2.3");
+        assert!(res.is_err(), "build failure must abort the release");
+        assert!(res
+            .unwrap_err()
+            .to_string()
+            .contains("Release build failed"));
+    }
+
+    #[test]
+    fn test_release_phase_bails_when_tag_fails() {
+        // build ok, then `git tag` fails -> must bail before push.
+        let mock = MockRunner::new();
+        mock.push_response(mock_output(true, "compiled", ""));
+        mock.push_response(mock_output(false, "", "fatal: tag 'v1.2.3' already exists"));
+        let p = pipeline_with(mock);
+        let res = p.run_release_phase("v1.2.3");
+        assert!(res.is_err(), "tag failure must abort the release");
+        assert!(res
+            .unwrap_err()
+            .to_string()
+            .contains("Failed to create tag"));
+    }
+
+    // NOTE: the full happy path (build -> tag -> push -> GitHub API) is not
+    // covered here because the release step makes a real blocking reqwest call
+    // to api.github.com and requires GITHUB_TOKEN. Making that hermetic needs a
+    // network-abstraction refactor, which is intentionally out of scope for
+    // v0.5.0 (see plan Part C exclusions).
+}
