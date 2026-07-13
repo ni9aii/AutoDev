@@ -14,11 +14,7 @@ impl Pipeline {
         log::log("Building release binary...");
         let build_output = self
             .runner
-            .run(
-                "cargo",
-                &["build", "--release"],
-                Some(&self.project_path),
-            )
+            .run("cargo", &["build", "--release"], Some(&self.project_path))
             .context("Failed to build release binary")?;
 
         if !build_output.status.success() {
@@ -85,7 +81,10 @@ impl Pipeline {
             .post(release_url)
             .header("Accept", "application/vnd.github+json")
             .bearer_auth(token)
-            .header("User-Agent", "auto-dev-pipeline/1.0")
+            .header(
+                "User-Agent",
+                format!("auto-dev-pipeline/{}", env!("CARGO_PKG_VERSION")),
+            )
             .body(release_body)
             .send()
             .context("Failed to create GitHub release")?;
@@ -95,7 +94,10 @@ impl Pipeline {
         } else {
             let status = response.status();
             let body = response.text().unwrap_or_default();
-            log::warn(&format!("GitHub release creation failed ({}): {}", status, body));
+            log::warn(&format!(
+                "GitHub release creation failed ({}): {}",
+                status, body
+            ));
         }
 
         log::success(&format!("Release {} complete", version));

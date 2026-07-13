@@ -78,7 +78,7 @@ run-pipeline /path/to/project review --hermes-mode --project myproject
 run-pipeline /path/to/project plan --hermes-mode --project myproject
 
 # Release (same in both modes)
-run-pipeline /path/to/project release --version v0.2.0
+run-pipeline /path/to/project release --release-version v0.5.0
 ```
 
 ### Legacy Mode
@@ -94,7 +94,7 @@ run-pipeline /path/to/project review
 run-pipeline /path/to/project plan
 
 # Release
-run-pipeline /path/to/project release --version v0.2.0
+run-pipeline /path/to/project release --release-version v0.5.0
 ```
 
 ### Direct binary usage
@@ -112,7 +112,6 @@ review-aggregator --dev-notes --project myproject
 | Variable | Required | Purpose |
 |----------|----------|---------|
 | `GITHUB_TOKEN` or `GITHUB_PAT` | For CI check and releases | GitHub API authentication |
-| `AUTO_DEV_VERSION` | Optional | Fallback version for release phase |
 | `DEV_NOTES_ROOT` | Optional | Root for `--dev-notes` paths (default: `~/obsidian-vault/dev-notes`; overridable via `--dev-notes-root`) |
 
 ## Project Structure
@@ -122,7 +121,9 @@ review-aggregator --dev-notes --project myproject
 ├── src/
 │   ├── lib.rs                  # Shared modules: log, git, markdown, test_runner
 │   └── bin/
-│       ├── run_pipeline.rs     # Main pipeline entry point
+│       ├── run_pipeline/       # Main pipeline entry point
+│       │   ├── main.rs
+│       │   └── phases/{review,aggregate,execute,release,verify}.rs
 │       ├── ci_check.rs         # CI status checker
 │       └── review_aggregator.rs # Review aggregation + plan generation
 ├── references/                 # Design patterns and integration guides

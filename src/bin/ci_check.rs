@@ -43,6 +43,7 @@ impl CiChecker {
     fn check_ci_status(&self, repo: &str) -> Result<bool> {
         let token = std::env::var("GITHUB_PAT")
             .ok()
+            .or_else(|| std::env::var("GITHUB_TOKEN").ok())
             .or_else(|| self.gh_auth_token().ok());
 
         if token.is_none() {
@@ -63,7 +64,10 @@ impl CiChecker {
         let mut request = client
             .get(&api_url)
             .header("Accept", "application/vnd.github+json")
-            .header("User-Agent", format!("auto-dev-pipeline/{}", env!("CARGO_PKG_VERSION")));
+            .header(
+                "User-Agent",
+                format!("auto-dev-pipeline/{}", env!("CARGO_PKG_VERSION")),
+            );
 
         if let Some(ref token) = token {
             request = request.header("Authorization", format!("Bearer {}", token));
@@ -85,7 +89,9 @@ impl CiChecker {
             anyhow::bail!("GitHub API error ({}): {}", status, msg);
         }
 
-        let data: serde_json::Value = response.json().context("Failed to parse GitHub API response")?;
+        let data: serde_json::Value = response
+            .json()
+            .context("Failed to parse GitHub API response")?;
 
         let total_count = data
             .get("total_count")
@@ -107,10 +113,22 @@ impl CiChecker {
         let mut all_passed = true;
 
         for run in runs.iter().take(3) {
-            let name = run.get("name").and_then(|v| v.as_str()).unwrap_or("Unknown");
-            let status = run.get("status").and_then(|v| v.as_str()).unwrap_or("unknown");
-            let conclusion = run.get("conclusion").and_then(|v| v.as_str()).unwrap_or("N/A");
-            let branch = run.get("head_branch").and_then(|v| v.as_str()).unwrap_or("unknown");
+            let name = run
+                .get("name")
+                .and_then(|v| v.as_str())
+                .unwrap_or("Unknown");
+            let status = run
+                .get("status")
+                .and_then(|v| v.as_str())
+                .unwrap_or("unknown");
+            let conclusion = run
+                .get("conclusion")
+                .and_then(|v| v.as_str())
+                .unwrap_or("N/A");
+            let branch = run
+                .get("head_branch")
+                .and_then(|v| v.as_str())
+                .unwrap_or("unknown");
             let url = run.get("html_url").and_then(|v| v.as_str()).unwrap_or("");
 
             let icon = match conclusion {
@@ -122,7 +140,10 @@ impl CiChecker {
                 _ => "🔄",
             };
 
-            println!("  {} {}: {} ({}) on {}", icon, name, status, conclusion, branch);
+            println!(
+                "  {} {}: {} ({}) on {}",
+                icon, name, status, conclusion, branch
+            );
             if !url.is_empty() {
                 println!("     URL: {}", url);
             }
@@ -158,7 +179,10 @@ impl CiChecker {
     }
 
     fn run(&self, args: &Args) -> Result<()> {
-        log::log(&format!("CI Status Checker v{} (Rust)", env!("CARGO_PKG_VERSION")));
+        log::log(&format!(
+            "CI Status Checker v{} (Rust)",
+            env!("CARGO_PKG_VERSION")
+        ));
         log::log(&format!("Project: {}", self.project_path.display()));
 
         // Get repo info
@@ -198,12 +222,14 @@ impl CiChecker {
         // Save report to dev-notes if requested
         if args.dev_notes {
             let project_name = args.project.clone().or_else(|| {
-                repo.as_ref().and_then(|r| r.split('/').nth(1).map(|s| s.to_string()))
+                repo.as_ref()
+                    .and_then(|r| r.split('/').nth(1).map(|s| s.to_string()))
             });
 
             if let Some(project) = project_name {
                 let root = resolve_dev_notes_root(args.dev_notes_root.as_ref())?;
-                if let Err(e) = self.save_dev_notes_report(&project, ci_passed, local_passed, &root) {
+                if let Err(e) = self.save_dev_notes_report(&project, ci_passed, local_passed, &root)
+                {
                     log::warn(&format!("Failed to save dev-notes report: {}", e));
                 }
             } else {
@@ -231,8 +257,8 @@ impl CiChecker {
             anyhow::bail!("gh auth token failed: {}", stderr);
         }
 
-        let token = String::from_utf8(output.stdout)
-            .context("gh auth token returned invalid UTF-8")?;
+        let token =
+            String::from_utf8(output.stdout).context("gh auth token returned invalid UTF-8")?;
         Ok(token.trim().to_string())
     }
 

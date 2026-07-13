@@ -20,19 +20,36 @@ impl Pipeline {
         log::log("Run the following 4 delegate_task calls one at a time (sequential to avoid rate limits):");
         eprintln!();
 
-        let _project_name = self.project_name.clone()
-            .or_else(|| self.project_path.file_name()
-                .and_then(|n| n.to_str())
-                .map(|s| s.to_string()))
+        let _project_name = self
+            .project_name
+            .clone()
+            .or_else(|| {
+                self.project_path
+                    .file_name()
+                    .and_then(|n| n.to_str())
+                    .map(|s| s.to_string())
+            })
             .unwrap_or_else(|| "unknown".to_string());
 
         let review_dir = self.output_dir.clone();
 
         let reviewers = [
-            ("code", "Code Reviewer: check logic, style, idioms, performance"),
-            ("security", "Security Reviewer: check vulnerabilities, unsafe code, secrets"),
-            ("architecture", "Architecture Reviewer: check structure, coupling, patterns"),
-            ("devops", "DevOps Reviewer: check CI/CD, dependencies, build, deploy"),
+            (
+                "code",
+                "Code Reviewer: check logic, style, idioms, performance",
+            ),
+            (
+                "security",
+                "Security Reviewer: check vulnerabilities, unsafe code, secrets",
+            ),
+            (
+                "architecture",
+                "Architecture Reviewer: check structure, coupling, patterns",
+            ),
+            (
+                "devops",
+                "DevOps Reviewer: check CI/CD, dependencies, build, deploy",
+            ),
         ];
 
         for (name, prompt) in &reviewers {
@@ -49,21 +66,35 @@ impl Pipeline {
             eprintln!();
         }
 
-        log::success(&format!("Review instructions generated. Output dir: {}", review_dir.display()));
+        log::success(&format!(
+            "Review instructions generated. Output dir: {}",
+            review_dir.display()
+        ));
         Ok(review_dir)
     }
 
     /// Legacy mode: launch reviewers via Claude Code CLI
     fn run_review_phase_legacy(&self) -> Result<PathBuf> {
-
         let review_dir = self.output_dir.join(format!("{}-reviews", self.timestamp));
         std::fs::create_dir_all(&review_dir)?;
 
         let reviewers = [
-            ("code", "Code Reviewer: check logic, style, idioms, performance"),
-            ("security", "Security Reviewer: check vulnerabilities, unsafe code, secrets"),
-            ("architecture", "Architecture Reviewer: check structure, coupling, patterns"),
-            ("devops", "DevOps Reviewer: check CI/CD, dependencies, build, deploy"),
+            (
+                "code",
+                "Code Reviewer: check logic, style, idioms, performance",
+            ),
+            (
+                "security",
+                "Security Reviewer: check vulnerabilities, unsafe code, secrets",
+            ),
+            (
+                "architecture",
+                "Architecture Reviewer: check structure, coupling, patterns",
+            ),
+            (
+                "devops",
+                "DevOps Reviewer: check CI/CD, dependencies, build, deploy",
+            ),
         ];
 
         for (name, prompt) in &reviewers {
@@ -115,7 +146,10 @@ impl Pipeline {
             }
         }
 
-        log::success(&format!("Review phase complete. Reports in: {}", review_dir.display()));
+        log::success(&format!(
+            "Review phase complete. Reports in: {}",
+            review_dir.display()
+        ));
         Ok(review_dir)
     }
 }
