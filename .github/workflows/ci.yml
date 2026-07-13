@@ -15,9 +15,13 @@ env:
 
 jobs:
   test:
-    name: Build & Test (Ubuntu)
-    runs-on: ubuntu-latest
+    name: Build & Test (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
     timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
 
     steps:
       - name: Checkout
@@ -67,8 +71,8 @@ jobs:
       - name: Upload artifacts
         uses: actions/upload-artifact@v7
         with:
-          name: autodev
+          name: autodev-${{ matrix.os }}
           path: |
-            target/release/run-pipeline
-            target/release/ci-check
-            target/release/review-aggregator
+            target/release/run-pipeline*
+            target/release/ci-check*
+            target/release/review-aggregator*
