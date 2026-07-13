@@ -6,126 +6,95 @@
   <img src="logo.png" alt="AutoDev logo" width="256">
 </p>
 
-Automated development pipeline: review → plan → execute → verify → release.
+**An AI-agent skill for the review → plan → execute → verify → release cycle.**
+AutoDev is a self-contained workflow you drop into your own agent harness — not
+a CLI app you drive by hand. Once installed, your agent gains a structured
+pipeline it runs with its own native tools.
 
-## Architecture (MVP)
+## Install the skill into your harness
 
-**Hermes Agent (orchestrator) + delegate_task subagents (executors)**
+The skill is the product. Pick the integration that matches your agent:
 
-All tasks run inside Hermes Agent. No external harnesses required.
-Rust binaries are optional accelerators.
-
-| Component | Role | Implementation |
-|-----------|------|----------------|
-| Hermes skill `autodev` | Orchestration, decision-making | `~/.hermes/skills/autonomous-ai-agents/autodev/` |
-| `delegate_task` | Reviewers, complex fixes | Hermes native |
-| `patch` / `read_file` | Simple fixes (≤2 files, ≤20 lines) | Hermes native |
-| `review-aggregator` | Finding aggregation, plan generation | Rust binary |
-| `ci-check` | CI status + local tests | Rust binary |
-| `run-pipeline` | Phase orchestration (legacy + Hermes mode) | Rust binary |
-
-## Quick Start
-
-### Hermes Mode (MVP)
+### Hermes Agent (reference integration)
 
 ```bash
-# Full pipeline with Hermes delegate_task
-run-pipeline /path/to/project full --hermes-mode --project myproject
-
-# Review only
-run-pipeline /path/to/project review --hermes-mode --project myproject
-
-# Review + plan
-run-pipeline /path/to/project plan --hermes-mode --project myproject
-
-# Release
-run-pipeline /path/to/project release --version v0.2.0
+# Copy the skill into your Hermes skills dir
+cp -r /path/to/AutoDev ~/.hermes/skills/autodev
 ```
 
-### Legacy Mode (Claude Code CLI)
+Then invoke it from a session with `/skill autodev`. The skill orchestrates the
+whole pipeline using Hermes native tools (`delegate_task`, `read_file`,
+`patch`, `terminal`).
+
+### Claude Code
+
+Use the dedicated Claude Code skill surface:
 
 ```bash
-# Requires `claude` CLI installed
-run-pipeline /path/to/project full
+cp skills/claude-code/SKILL.md /path/to/your-claude-skills/autodev/SKILL.md
 ```
 
-## Hermes Mode Workflow
+### Any other harness
 
-### Phase 1 — Review
+Point your harness at `SKILL.md` in this repo (and keep the `references/`
+folder alongside it for the deep-dive guides). AutoDev needs only your agent's
+native capabilities — file read/write, shell, and (optionally) subagents.
+**No external binaries are required** to run the pipeline end to end.
 
-`run-pipeline --hermes-mode` prints delegate_task instructions for 4 parallel reviewers:
+> **That's it.** There is nothing to "run" from a terminal to use AutoDev — you
+> load the skill and let your agent drive it. The Rust binaries below are
+> optional accelerators, not a prerequisite.
 
-```python
-delegate_task(
-    goal="Code Reviewer: check logic, style, idioms, performance",
-    context="""
-    PROJECT_PATH: /path/to/project
-    OUTPUT_PATH: $DEV_NOTES_ROOT/myproject/reviews/20260606_143022/code-review.md
-    """,
-    toolsets=['file', 'search_files', 'terminal']
-)
-```
+## How it works
 
-Reports saved to `$DEV_NOTES_ROOT/<project>/reviews/<timestamp>/`.
+| Layer | Role | Implementation |
+|-------|------|----------------|
+| **Skill** (`SKILL.md`) | Orchestration & decision-making for the whole pipeline | Agent-native |
+| `delegate_task` | Parallel reviewers, complex fixes | Agent-native (Hermes) |
+| `read_file` + `patch` | Simple fixes (≤2 files, ≤20 lines) | Agent-native |
+| `review-aggregator` | Finding aggregation, dedupe, plan generation | Rust binary (optional) |
+| `ci-check` | CI status + local test run | Rust binary (optional) |
+| `run-pipeline` | Full phase orchestration (Hermes or legacy mode) | Rust binary (optional) |
 
-### Phase 2 — Aggregate
+In the default **Hermes mode** the entire pipeline executes with your agent's
+own tools. The Rust binaries are *accelerators* for the heavier mechanical
+steps (deduplicating findings across reviewers, hitting the GitHub API for CI
+status) — you can use the skill without them, or add them when you want the
+speedup.
+
+### Two execution modes
+
+| Mode | Executors | Requires |
+|------|-----------|----------|
+| **Hermes** (default) | `delegate_task` / `read_file`+`patch` | Your agent only |
+| Legacy | shells out to the `claude -p` CLI | Claude Code CLI, authenticated |
+
+Hermes mode is the integration target for harness users — it never invokes an
+external binary, so it works regardless of any other tool's auth state. The
+legacy mode is a fallback for agents that wrap Claude Code; it runs a pre-flight
+auth check and fails fast with a clear message if `claude` is missing or its
+OAuth session has expired (see issue #1).
+
+## Rust binaries (optional accelerators)
+
+Only relevant if you want the binary speedups. Build and install:
 
 ```bash
-review-aggregator --dev-notes --project myproject
+cargo build --release
+cargo install --path .        # puts run-pipeline, review-aggregator, ci-check on PATH
 ```
 
-Auto-discovers latest reviews, generates plan at `$DEV_NOTES_ROOT/<project>/plans/<timestamp>-plan.md`.
+`run-pipeline` also supports a `--json` flag that emits a machine-readable
+summary (status, version, phase, mode, timestamp, output dir) on **stdout** with
+all human log output routed to **stderr** — useful when your harness wraps the
+binary and parses its result programmatically.
 
-### Phase 3 — Execute
+## dev-notes layout
 
-Hermes mode prints per-fix instructions:
-- Simple fixes → `read_file` + `patch`
-- Complex fixes → `delegate_task`
-
-### Phase 4 — Verify
-
-```bash
-ci-check /path/to/project --dev-notes --project myproject
-```
-
-Saves report to `$DEV_NOTES_ROOT/<project>/ci-reports/<timestamp>-ci-status.md`.
-
-### Phase 5 — Release
-
-```bash
-run-pipeline /path/to/project release --version v0.2.0
-```
-
-## Modes & Authentication
-
-The pipeline has two execution modes:
-
-| Mode | Flag | Executors | Requires |
-|------|------|-----------|----------|
-| Hermes (MVP, default going forward) | `--hermes-mode` | `delegate_task` / `read_file`+`patch` | Hermes Agent only |
-| Legacy | _(none)_ | shells out to `claude -p` CLI | Claude Code CLI, authenticated |
-
-**Legacy mode requires an authenticated Claude Code CLI.** Before any
-`claude -p` call, `run-pipeline` runs a pre-flight auth check
-(`claude -p "reply with the single word: OK" --max-turns 1`). If the CLI is
-missing or its session is expired/unauthenticated, the pipeline fails fast
-with a clear message instead of silently producing empty reviews:
-
-```
-[auto-dev] ERROR Claude Code CLI is installed but NOT authenticated.
-[auto-dev] ERROR Re-authenticate with: claude (interactive login)
-[auto-dev] ERROR Or use --hermes-mode for delegate_task-based execution (no Claude CLI needed).
-```
-
-> **Workaround when Claude Code auth is unavailable:** use `--hermes-mode`.
-> It performs the entire pipeline (review → aggregate → execute → verify)
-> inside Hermes Agent and never invokes the `claude` binary, so it works
-> regardless of Claude Code's auth state. See issue #1.
-
-## Directory Layout (dev-notes)
-
-`$DEV_NOTES_ROOT` defaults to `~/obsidian-vault/dev-notes` (override via
-`--dev-notes-root` or the `DEV_NOTES_ROOT` env var):
+AutoDev keeps its intermediate artifacts in a dev-notes tree (default
+`~/obsidian-vault/dev-notes`, override via `--dev-notes-root` or the
+`DEV_NOTES_ROOT` env var). This is where the skill writes reviews, plans, and
+CI reports per project:
 
 ```
 $DEV_NOTES_ROOT/
@@ -142,52 +111,45 @@ $DEV_NOTES_ROOT/
         └── YYYYMMDD_HHMMSS-ci-status.md
 ```
 
-## Installation
-
-```bash
-# Clone
-git clone https://github.com/ni9aii/AutoDev.git
-cd AutoDev
-
-# Build Rust binaries (optional but recommended)
-cargo build --release
-
-# Install to PATH
-cargo install --path .
-```
-
-## Requirements
-
-- Rust 1.70+ (for binaries)
-- Hermes Agent (for orchestration)
-- GitHub PAT (for CI checks and releases)
-
-## Environment Variables
+## Configuration
 
 | Variable | Description |
 |----------|-------------|
-| `GITHUB_TOKEN` / `GITHUB_PAT` | GitHub API authentication |
-| `AUTO_DEV_VERSION` | Fallback version for release phase |
-| `DEV_NOTES_ROOT` | Root for `--dev-notes` paths (default: `~/obsidian-vault/dev-notes`) |
+| `GITHUB_TOKEN` / `GITHUB_PAT` | GitHub API auth (CI checks, releases) |
+| `AUTO_DEV_VERSION` | Fallback version for the release phase |
+| `DEV_NOTES_ROOT` | Root for dev-notes paths (default: `~/obsidian-vault/dev-notes`) |
 
-## Project Structure
+## References
+
+The `references/` folder holds deeper integration notes (not required to use
+the skill, but useful when adapting it):
+
+| File | Purpose |
+|------|---------|
+| `references/git-sync-checklist.md` | Pre/post-work git sync steps |
+| `references/hermes-delegate-task-integration.md` | `delegate_task` subagent integration guide |
+| `references/iteration-2-patterns.md` | Partial-fix traps, regressions, edge cases |
+
+## Project structure
 
 ```
 .
 ├── src/
 │   ├── lib.rs                  # Shared modules (log, git, markdown, test_runner)
 │   └── bin/
-│       ├── run_pipeline.rs     # Main pipeline entry point
-│       ├── ci_check.rs         # CI status checker
-│       └── review_aggregator.rs # Review aggregation + plan generation
-├── .github/workflows/
-│   └── ci.yml                  # CI configuration (Arch Linux)
-├── Cargo.toml
+│       ├── run_pipeline.rs     # Optional pipeline entry point
+│       ├── ci_check.rs         # Optional CI status checker
+│       └── review_aggregator.rs # Optional aggregation + plan generation
+├── skills/
+│   └── claude-code/SKILL.md    # Claude Code skill surface
+├── references/                 # Integration & pattern guides
+├── .github/workflows/ci.yml    # CI (Arch Linux)
+├── Cargo.toml / Cargo.lock
 ├── README.md
-├── CHANGELOG.md
-└── LICENSE
+├── SKILL.md                    # The skill — primary integration artifact
+└── CHANGELOG.md
 ```
 
 ## License
 
-MIT License — see [LICENSE](LICENSE)
+MIT — see [LICENSE](LICENSE).
