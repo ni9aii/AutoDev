@@ -150,6 +150,21 @@ the skill, but useful when adapting it):
 └── CHANGELOG.md
 ```
 
+## References
+
+Deeper integration and pattern notes (not required to use the skill, but
+useful when adapting it):
+
+| File | Purpose |
+|------|---------|
+| `references/skill-walkthrough.md` | Phase-by-phase view of what the skill does |
+| `references/hermes-delegate-task-integration.md` | `delegate_task` subagent integration (current code) |
+| `references/dev-notes-schema.md` | Exact dev-notes layout, artifact paths, finding format |
+| `references/json-output.md` | `run-pipeline --json` output contract |
+| `references/iteration-2-patterns.md` | Report parser patterns, Do Now/Defer, regression checklist |
+| `references/troubleshooting.md` | FAQ: Claude auth, empty reviews, dev-notes not found |
+| `references/git-sync-checklist.md` | Pre/post-work git sync steps |
+
 ## License
 
 MIT — see [LICENSE](LICENSE).
