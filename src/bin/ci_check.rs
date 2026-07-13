@@ -8,7 +8,7 @@ use std::path::PathBuf;
 /// CI Status Checker for Auto-Dev Pipeline
 /// Checks GitHub Actions status via API and runs local tests
 #[derive(Parser, Debug)]
-#[command(name = "ci-check", version = "1.1.0")]
+#[command(name = "ci-check", version = env!("CARGO_PKG_VERSION"))]
 struct Args {
     /// Project path (git repo)
     #[arg(default_value = ".")]
@@ -22,7 +22,7 @@ struct Args {
     #[arg(long)]
     project: Option<String>,
 
-    /// Root directory for dev-notes (overrides $DEV_NOTES_ROOT and ~/dev-notes default)
+    /// Root directory for dev-notes (overrides $DEV_NOTES_ROOT and ~/obsidian-vault/dev-notes default)
     #[arg(long)]
     dev_notes_root: Option<PathBuf>,
 }
@@ -63,7 +63,7 @@ impl CiChecker {
         let mut request = client
             .get(&api_url)
             .header("Accept", "application/vnd.github+json")
-            .header("User-Agent", "auto-dev-pipeline/1.0");
+            .header("User-Agent", format!("auto-dev-pipeline/{}", env!("CARGO_PKG_VERSION")));
 
         if let Some(ref token) = token {
             request = request.header("Authorization", format!("Bearer {}", token));
@@ -158,7 +158,7 @@ impl CiChecker {
     }
 
     fn run(&self, args: &Args) -> Result<()> {
-        log::log("CI Status Checker v1.1.0 (Rust)");
+        log::log(&format!("CI Status Checker v{} (Rust)", env!("CARGO_PKG_VERSION")));
         log::log(&format!("Project: {}", self.project_path.display()));
 
         // Get repo info
@@ -282,7 +282,7 @@ impl CiChecker {
     }
 }
 
-/// Resolve dev-notes root: --dev-notes-root > $DEV_NOTES_ROOT > ~/dev-notes
+/// Resolve dev-notes root: --dev-notes-root > $DEV_NOTES_ROOT > ~/obsidian-vault/dev-notes
 fn resolve_dev_notes_root(override_path: Option<&PathBuf>) -> Result<PathBuf> {
     if let Some(p) = override_path {
         return Ok(p.clone());
@@ -291,7 +291,7 @@ fn resolve_dev_notes_root(override_path: Option<&PathBuf>) -> Result<PathBuf> {
         return Ok(PathBuf::from(env_root));
     }
     let home = dirs::home_dir().context("Could not determine home directory")?;
-    Ok(home.join("dev-notes"))
+    Ok(home.join("obsidian-vault").join("dev-notes"))
 }
 
 fn main() -> Result<()> {

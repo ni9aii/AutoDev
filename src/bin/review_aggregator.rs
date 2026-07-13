@@ -35,7 +35,7 @@ static LINE_RE: Lazy<Regex> = Lazy::new(|| {
 /// Review Aggregator for Auto-Dev Pipeline
 /// Aggregates findings from reviewers and generates prioritized fix plan
 #[derive(Parser, Debug)]
-#[command(name = "review-aggregator", version = "1.1.0")]
+#[command(name = "review-aggregator", version = env!("CARGO_PKG_VERSION"))]
 struct Args {
     /// Directory with review reports (optional if --dev-notes is set)
     #[arg(long, required = false)]
@@ -54,7 +54,7 @@ struct Args {
     #[arg(long, default_value = "false")]
     dev_notes: bool,
 
-    /// Root directory for dev-notes (overrides $DEV_NOTES_ROOT and ~/dev-notes default)
+    /// Root directory for dev-notes (overrides $DEV_NOTES_ROOT and ~/obsidian-vault/dev-notes default)
     #[arg(long)]
     dev_notes_root: Option<PathBuf>,
 }
@@ -319,7 +319,7 @@ fn resolve_dev_notes_root(override_path: Option<&PathBuf>) -> Result<PathBuf> {
         return Ok(PathBuf::from(env_root));
     }
     let home = dirs::home_dir().context("Could not determine home directory")?;
-    Ok(home.join("dev-notes"))
+    Ok(home.join("obsidian-vault").join("dev-notes"))
 }
 
 fn main() -> Result<()> {
