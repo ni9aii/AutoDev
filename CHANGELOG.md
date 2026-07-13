@@ -28,6 +28,17 @@
 - Hardcoded version strings — replaced literal `"1.1.0"` (and the
   `"auto-dev-pipeline/1.0"` User-Agent) with `env!("CARGO_PKG_VERSION")` in
   all three binaries, so `--version` and logs track `Cargo.toml` automatically.
+- Legacy-mode Claude auth pre-flight — `run-pipeline` now runs a `claude -p`
+  smoke-test before invoking Claude Code CLI (review/execute phases). A
+  present-but-unauthenticated CLI (e.g. expired OAuth) used to report success
+  on `--version` yet fail deep inside the run; now it fails fast with a clear
+  message and points to `--hermes-mode` as the workaround (issue #1).
+  `run_review_phase_legacy`/`execute_via_claude` now bail on non-zero Claude
+  exit instead of only warning.
+
+### Added
+- Unit tests for `check_claude_auth`: authenticated OK, expired-OAuth error,
+  missing-binary error (via `MockRunner`).
 
 ### Changed
 - Docs reconciliation: `ni9aii/AutoDev` declared single source of truth for

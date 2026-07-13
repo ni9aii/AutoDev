@@ -40,7 +40,13 @@ No external harnesses required. Rust binaries are optional accelerators.
 ### Legacy Mode
 
 Uses Claude Code CLI (`claude -p`) for reviews and execution.
-Requires `npm install -g @anthropic-ai/claude-code`.
+Requires `npm install -g @anthropic-ai/claude-code` **and an authenticated
+session**. `run-pipeline` runs a pre-flight `claude -p` auth check and fails
+fast with a clear message if the CLI is missing or its OAuth session is
+expired (see issue #1).
+
+> When Claude Code auth is unavailable, use `--hermes-mode` — it runs the
+> whole pipeline inside Hermes Agent and never calls `claude`.
 
 ## Build
 
