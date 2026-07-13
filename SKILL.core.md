@@ -1,9 +1,5 @@
 ---
-name: autodev
-description: "AutoDev: review → plan → execute → verify → release pipeline for your agent"
-version: 1.0.0
-author: ni9aii
-license: MIT
+{{FRONTMATTER}}
 ---
 
 # AutoDev Pipeline — Agent Skill
@@ -35,9 +31,7 @@ follow what's documented here. This file is **generated** from `SKILL.core.md`
 
 ## Invocation
 
-Load this SKILL.md into your harness (see README → "Install the skill into
-your harness"), then invoke it so your agent drives the pipeline with its own
-native tools.
+{{INVOKE}}
 
 ## What This Skill Does
 
@@ -132,20 +126,7 @@ GitHub Actions with an ubuntu + windows matrix:
 
 ### `review` — reviewers
 
-Run the four reviewers (code, security, architecture, devops) with your
-harness's subagent / parallel-execution mechanism. Each reads the sources and
-writes its report to:
-
-```text
-$DEV_NOTES_ROOT/<project>/reviews/<YYYY-MM-DD>-<role>-review-report.md
-```
-
-Finding format per reviewer:
-
-```text
-### [CRITICAL] Title
-Description. File: `path/to/file.rs`. Line: 42.
-```
+{{REVIEWERS}}
 
 ### `plan` — aggregation
 
@@ -167,10 +148,7 @@ Result: a plan in `$DEV_NOTES_ROOT/<project>/plans/<timestamp>-plan.md` with
 Read the latest plan from `$DEV_NOTES_ROOT/<project>/plans/`. For each fix in the
 "Do Now" section:
 
-- **Simple fixes** (≤2 files, ≤20 lines): apply directly with your harness's
-  read/edit tools.
-- **Complex fixes**: delegate to a subagent.
-Commit after each logical fix.
+{{EXECUTE}}
 
 ### `full` — full pipeline
 
@@ -230,4 +208,4 @@ $DEV_NOTES_ROOT/
 
 This skill is distributed via the repo's `install.sh` (one command, auto-detects
 your harness) or by copying the generated `SKILL.md` into your harness's skill
-directory (currently: ``).
+directory (currently: `{{INSTALL_PATH_HINT}}`).
