@@ -100,6 +100,8 @@ impl Pipeline {
                         .map(|s| s.to_string())
                 })
                 .unwrap_or_else(|| "unknown".to_string());
+            auto_dev_pipeline::validation::validate_project_name(&project)
+                .map_err(|e| anyhow::anyhow!(e))?;
             dev_notes_root
                 .join(project)
                 .join("reviews")

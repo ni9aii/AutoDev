@@ -327,6 +327,39 @@ pub mod validation {
         }
         Ok(())
     }
+
+    /// Validate a project name before it is used as a path component in the
+    /// dev-notes tree (`<root>/<project>/reviews/…`). Rejects anything that
+    /// could escape the root via path traversal: path separators, `..`
+    /// components, absolute paths, and empty/whitespace names. This is a
+    /// security control — `--project` (and a derived repo name) is attacker-
+    /// influenced input that is joined onto the dev-notes root.
+    pub fn validate_project_name(name: &str) -> Result<(), String> {
+        let clean = name.trim();
+        if clean.is_empty() {
+            return Err("Project name is empty".to_string());
+        }
+        if clean.contains('/') || clean.contains('\\') {
+            return Err(format!(
+                "Invalid project name '{}': must not contain path separators",
+                clean
+            ));
+        }
+        if clean == ".." || clean == "." {
+            return Err(format!(
+                "Invalid project name '{}': reserved path component",
+                clean
+            ));
+        }
+        // Belt-and-suspenders: reject any embedded parent-dir traversal.
+        if clean
+            .split(|c| ['/', '\\'].contains(&c))
+            .any(|seg| seg == "..")
+        {
+            return Err(format!("Invalid project name '{}': path traversal", clean));
+        }
+        Ok(())
+    }
 }
 
 pub mod markdown {
@@ -482,6 +515,22 @@ mod tests {
         assert!(validation::validate_version("").is_err());
         assert!(validation::validate_version("; rm -rf /").is_err());
         assert!(validation::validate_version("$(whoami)").is_err());
+    }
+
+    #[test]
+    fn test_validate_project_name_blocks_traversal() {
+        // Valid names pass.
+        assert!(validation::validate_project_name("AutoDev").is_ok());
+        assert!(validation::validate_project_name("my-project_1").is_ok());
+
+        // Reject path traversal and separators (Fix 21 from dogfood review).
+        assert!(validation::validate_project_name("../escape").is_err());
+        assert!(validation::validate_project_name("foo/bar").is_err());
+        assert!(validation::validate_project_name("foo\\bar").is_err());
+        assert!(validation::validate_project_name("..").is_err());
+        assert!(validation::validate_project_name(".").is_err());
+        assert!(validation::validate_project_name("").is_err());
+        assert!(validation::validate_project_name("  ").is_err());
     }
 
     #[test]
