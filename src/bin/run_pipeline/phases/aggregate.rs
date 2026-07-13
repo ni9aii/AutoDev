@@ -25,23 +25,21 @@ impl Pipeline {
             self.output_dir.join(format!("{}-plan.md", self.timestamp))
         };
 
-        let mut args: Vec<String> = vec![
-            "--input-dir".to_string(),
-            review_dir.display().to_string(),
-            "--output".to_string(),
-            plan_path.display().to_string(),
-        ];
-
-        if self.hermes_mode {
-            if let Some(ref project) = self.project_name {
-                args.push("--project".to_string());
-                args.push(project.clone());
-            }
-            args.push("--dev-notes".to_string());
-            args.push("--dev-notes-root".to_string());
-            args.push(self.dev_notes_root.display().to_string());
-        }
-
+        let req = auto_dev_pipeline::bin_contract::AggregateRequest {
+            input_dir: review_dir.to_path_buf(),
+            output: plan_path.clone(),
+            project: if self.hermes_mode {
+                self.project_name.clone()
+            } else {
+                None
+            },
+            dev_notes_root: if self.hermes_mode {
+                Some(self.dev_notes_root.clone())
+            } else {
+                None
+            },
+        };
+        let args = req.to_args();
         let arg_refs: Vec<&str> = args.iter().map(|s| s.as_str()).collect();
 
         let aggregator = auto_dev_pipeline::bin_contract::resolve_companion(

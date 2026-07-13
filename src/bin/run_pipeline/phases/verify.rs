@@ -11,17 +11,16 @@ impl Pipeline {
 
         // Check CI status
         log::log("Checking CI status...");
-        let project_path_str = self.project_path.display().to_string();
-        let mut args: Vec<String> = vec![project_path_str];
-
-        if self.hermes_mode {
-            if let Some(ref project) = self.project_name {
-                args.push("--project".to_string());
-                args.push(project.clone());
-            }
-            args.push("--dev-notes".to_string());
-        }
-
+        let req = auto_dev_pipeline::bin_contract::CiCheckRequest {
+            project_path: self.project_path.clone(),
+            project: if self.hermes_mode {
+                self.project_name.clone()
+            } else {
+                None
+            },
+            dev_notes: self.hermes_mode,
+        };
+        let args = req.to_args();
         let arg_refs: Vec<&str> = args.iter().map(|s| s.as_str()).collect();
 
         let ci_check = auto_dev_pipeline::bin_contract::resolve_companion(
