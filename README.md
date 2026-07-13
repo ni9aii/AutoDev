@@ -11,6 +11,32 @@ AutoDev is a self-contained workflow you drop into your own agent harness — no
 a CLI app you drive by hand. Once installed, your agent gains a structured
 pipeline it runs with its own native tools.
 
+### Why AutoDev
+
+Most "vibe coding" stops at a first working draft. AutoDev is built to take an
+existing concept and **cycle it to done** — review → code → test (locally and
+on CI) → repeat, until *you* decide the project quality is good enough to
+release. Each loop tightens the code instead of shipping the lucky first pass.
+
+What makes that reliable:
+
+- **Loop until release-ready.** The pipeline re-runs review → execute → verify
+  on every iteration, so defects found late still get fixed, not deferred to a
+  "later" that never comes.
+- **Local + CI, not just local.** Fixes are verified by your test suite *and*
+  GitHub Actions, so a green local run can't hide a broken CI.
+- **Reproducible, file-based trail.** Every review, plan, and CI report lands
+  in `dev-notes/` as plain markdown — traceable, diffable, and git-friendly.
+- **Multi-harness by design.** The skill is just `SKILL.md` + `references/`;
+  any agent harness can load it. The bundled Rust scripts are *optional
+  accelerators* for the mechanical steps (aggregation, CI status) — harnesses
+  that don't run them still get the full workflow through the agent's own
+  tools.
+
+See [`examples/`](examples/) for a fully worked sample: four review reports →
+a generated fix plan ([`examples/sample-project/plans/`](examples/sample-project/plans/))
+and a machine-readable [`--json` summary](examples/json-output.json).
+
 ## Install the skill into your harness
 
 The skill is the product. Pick the integration that matches your agent:

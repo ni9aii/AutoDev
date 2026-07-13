@@ -30,17 +30,28 @@ static FILE_RE: Lazy<Regex> =
 static LINE_RE: Lazy<Regex> =
     Lazy::new(|| Regex::new(r"(?i)[Ll]ine:\s*(\d+)").expect("Invalid LINE_RE pattern"));
 
-/// Matches "Description:" / "File:" / "Line:" lead-in lines that are parser
-/// metadata, not part of the actual finding description.
+/// Matches `File:` / `Line:` / `Source:` lead-in lines. These carry a single
+/// fact that the parser already extracted into structured fields, so the whole
+/// line is dropped from the description body.
 static META_RE: Lazy<Regex> = Lazy::new(|| {
-    Regex::new(r"(?im)^\s*(File|Description|Line|Source)\s*:\s*").expect("Invalid META_RE pattern")
+    Regex::new(r"(?im)^\s*(File|Line|Source)\s*:\s*\S.*$").expect("Invalid META_RE pattern")
 });
 
-/// Strips parser-metadata lines (File:, Description:, Line:, Source:) from a
-/// finding body so the generated plan does not duplicate them.
+/// Matches the `Description:` lead-in. The description is multi-line, so only
+/// the prefix is stripped and the following text is kept.
+static DESC_RE: Lazy<Regex> = Lazy::new(|| {
+    Regex::new(r"(?im)^\s*Description\s*:\s*").expect("Invalid DESC_RE pattern")
+});
+
+/// Strips parser-metadata from a finding body so the generated plan does not
+/// duplicate it. `File:`/`Line:`/`Source:` lines are dropped entirely (their
+/// value is already in structured fields); `Description:` keeps its text with
+/// only the prefix removed.
 fn clean_body(body: &str) -> String {
-    body.lines()
-        .filter(|l| !META_RE.is_match(l))
+    body
+        .lines()
+        .map(|l| DESC_RE.replace(META_RE.replace(l, "").as_ref(), "").trim().to_string())
+        .filter(|l| !l.is_empty())
         .collect::<Vec<_>>()
         .join("\n")
         .trim()

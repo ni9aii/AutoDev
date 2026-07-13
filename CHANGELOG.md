@@ -3,14 +3,32 @@
 ## [Unreleased]
 
 ### Added
-- Integration tests (`tests/integration.rs`) — run `review-aggregator` against a
-  temp dev-notes tree and assert a plan is produced; also cover the no-reviews
-  case (generates an empty plan instead of failing).
-- `run-pipeline --json` emits a machine-readable summary (status, version,
-  project, phase, mode, timestamp, output_dir) on stdout. All human log output
-  (including Hermes review instructions) now goes to stderr, so stdout stays
-  clean for piping/parsing.
-- Unit test for `run-pipeline --json` output validity (`tests/integration.rs`).
+- `examples/` — a fully worked sample: four review reports
+  (`examples/sample-project/reviews/`) feed `review-aggregator` to produce a
+  real fix plan (`examples/sample-project/plans/`) and a machine-readable
+  `run-pipeline --json` summary (`examples/json-output.json`). Useful as a
+  copy-paste starting point and as documentation of the expected formats.
+- End-to-end integration test `integration_run_pipeline_plan_end_to_end` —
+  drives `run-pipeline <git-repo> plan` through arg parse → git prerequisite →
+  aggregate phase and asserts a plan file is written.
+- "Why AutoDev" sections in README and SKILL: positions the skill as a
+  cycle-to-release workflow for vibe coding (review → code → test locally and
+  on CI, repeated until release-ready) and stresses multi-harness design (the
+  Rust scripts are optional accelerators).
+
+### Fixed
+- `review-aggregator` description parsing: `File:`/`Line:`/`Source:` lines are
+  now dropped entirely from the body (their value is already in structured
+  fields), while `Description:` keeps its text with only the prefix stripped —
+  so multi-line descriptions are no longer truncated at the first line.
+- `run-pipeline` aggregate phase no longer passes the unsupported
+  `--dev-notes-root` flag to `review-aggregator` (the aggregator resolves the
+  root itself), fixing plan generation on harnesses where the installed
+  binary predated that flag.
+- Installed binaries refreshed (`cargo install --path . --force`) so the
+  on-PATH `review-aggregator`/`run-pipeline`/`ci-check` match the source.
+
+### Changed
 - Documentation overhaul for harness integrators:
   - `README.md` / `SKILL.md` refactored to lead with skill installation, not CLI
     usage.
