@@ -310,25 +310,46 @@ pub mod test_runner {
         pub stderr: String,
     }
 
-    pub fn run_local_tests(project_path: &Path, runner: &dyn ProcessRunner) -> Result<TestResult> {
-        let test_runner = detect_test_runner(project_path).context(
-            "No test runner detected (Makefile, package.json, pyproject.toml, setup.py)",
-        )?;
+    /// Run the project's detected local test runner.
+    ///
+    /// Returns `Ok(Some(result))` when a runner was found and executed,
+    /// `Ok(None)` when no runner is configured *or* the configured command is
+    /// not available (e.g. `make` absent on a Windows CI runner) — callers
+    /// should treat `None` as a non-fatal skip, not a failure. `Err` is reserved
+    /// for unexpected internal errors.
+    pub fn run_local_tests(
+        project_path: &Path,
+        runner: &dyn ProcessRunner,
+    ) -> Result<Option<TestResult>> {
+        let test_runner = match detect_test_runner(project_path) {
+            Some(tr) => tr,
+            None => return Ok(None),
+        };
 
-        let output = runner
-            .run(
-                test_runner.program(),
-                test_runner.args(),
-                Some(project_path),
-            )
-            .with_context(|| format!("Failed to run '{}'", test_runner.name()))?;
+        let output = match runner.run(
+            test_runner.program(),
+            test_runner.args(),
+            Some(project_path),
+        ) {
+            Ok(o) => o,
+            Err(e) => {
+                // Runner is configured but the command can't be launched
+                // (e.g. `make` not installed). Non-fatal: skip, don't fail.
+                crate::log::warn(&format!(
+                    "Test runner '{}' not available, skipping: {}",
+                    test_runner.name(),
+                    e
+                ));
+                return Ok(None);
+            }
+        };
 
-        Ok(TestResult {
+        Ok(Some(TestResult {
             runner: test_runner,
             success: output.status.success(),
             stdout: String::from_utf8_lossy(&output.stdout).to_string(),
             stderr: String::from_utf8_lossy(&output.stderr).to_string(),
-        })
+        }))
     }
 }
 
