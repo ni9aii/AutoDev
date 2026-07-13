@@ -5,6 +5,19 @@ runs for the review → plan → execute → verify → release cycle. Install i
 your harness (see README → "Install the skill into your harness"), then invoke
 it and let your agent drive the pipeline with its own native tools.
 
+## Why AutoDev
+
+Most "vibe coding" stops at a first working draft. AutoDev takes an existing
+concept and **cycles it to done** — review → code → test (locally and on CI) →
+repeat, until *you* judge the project quality good enough to release. Each loop
+tightens the code instead of shipping the lucky first pass, and fixes are
+verified by both your test suite and GitHub Actions.
+
+The skill is harness-agnostic: it's `SKILL.md` + `references/`, loadable into
+any agent. The bundled Rust scripts are *optional accelerators* for the
+mechanical steps — harnesses that don't run them still get the full workflow
+through the agent's own tools.
+
 ## Source of Truth
 
 This repository (`ni9aii/AutoDev`) is the canonical source for AutoDev pipeline
