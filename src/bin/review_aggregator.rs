@@ -611,4 +611,38 @@ Some detail.\n",
         let sevs: Vec<_> = out.iter().map(|f| f.severity.clone()).collect();
         assert_eq!(sevs, vec!["CRITICAL", "IMPORTANT", "MINOR"]);
     }
+
+    #[test]
+    fn test_parse_review_extracts_file_line_and_role() {
+        let dir = std::env::temp_dir().join(format!("autodev-b2a-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let p = dir.join("security-review.md");
+        std::fs::write(
+            &p,
+            "### [CRITICAL] SQL injection\nBad query.\nFile: `src/db.rs`\nLine: 42\n",
+        )
+        .unwrap();
+        let f = parse_review_file(&p).unwrap();
+        assert_eq!(f.len(), 1);
+        assert_eq!(f[0].role, "security");
+        assert_eq!(f[0].severity, "CRITICAL");
+        assert_eq!(f[0].file.as_deref(), Some("src/db.rs"));
+        assert_eq!(f[0].line, Some(42));
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn test_parse_review_skips_self_corrected_findings() {
+        let dir = std::env::temp_dir().join(format!("autodev-b2b-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let p = dir.join("code-review.md");
+        std::fs::write(
+            &p,
+            "### [CRITICAL] Off by one\nOn re-checking this is a false alarm, not a bug.\n",
+        )
+        .unwrap();
+        let f = parse_review_file(&p).unwrap();
+        assert_eq!(f.len(), 0, "self-corrected finding should be skipped");
+        let _ = std::fs::remove_dir_all(&dir);
+    }
 }
