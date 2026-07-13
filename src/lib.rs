@@ -247,7 +247,7 @@ pub mod bin_contract {
 
 pub mod test_runner {
     use crate::process::ProcessRunner;
-    use anyhow::{Context, Result};
+    use anyhow::Result;
     use std::path::Path;
 
     #[derive(Debug, Clone, Copy, PartialEq, Eq)]
