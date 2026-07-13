@@ -92,6 +92,32 @@ Saves report to `$DEV_NOTES_ROOT/<project>/ci-reports/<timestamp>-ci-status.md`.
 run-pipeline /path/to/project release --version v0.2.0
 ```
 
+## Modes & Authentication
+
+The pipeline has two execution modes:
+
+| Mode | Flag | Executors | Requires |
+|------|------|-----------|----------|
+| Hermes (MVP, default going forward) | `--hermes-mode` | `delegate_task` / `read_file`+`patch` | Hermes Agent only |
+| Legacy | _(none)_ | shells out to `claude -p` CLI | Claude Code CLI, authenticated |
+
+**Legacy mode requires an authenticated Claude Code CLI.** Before any
+`claude -p` call, `run-pipeline` runs a pre-flight auth check
+(`claude -p "reply with the single word: OK" --max-turns 1`). If the CLI is
+missing or its session is expired/unauthenticated, the pipeline fails fast
+with a clear message instead of silently producing empty reviews:
+
+```
+[auto-dev] ERROR Claude Code CLI is installed but NOT authenticated.
+[auto-dev] ERROR Re-authenticate with: claude (interactive login)
+[auto-dev] ERROR Or use --hermes-mode for delegate_task-based execution (no Claude CLI needed).
+```
+
+> **Workaround when Claude Code auth is unavailable:** use `--hermes-mode`.
+> It performs the entire pipeline (review → aggregate → execute → verify)
+> inside Hermes Agent and never invokes the `claude` binary, so it works
+> regardless of Claude Code's auth state. See issue #1.
+
 ## Directory Layout (dev-notes)
 
 `$DEV_NOTES_ROOT` defaults to `~/obsidian-vault/dev-notes` (override via
