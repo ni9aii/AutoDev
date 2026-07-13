@@ -56,7 +56,7 @@ impl Pipeline {
         }
 
         let stdout = String::from_utf8_lossy(&output.stdout);
-        print!("{}", stdout);
+        eprint!("{}", stdout);
 
         log::success(&format!("Aggregation complete. Plan: {}", plan_path.display()));
         Ok(plan_path)
