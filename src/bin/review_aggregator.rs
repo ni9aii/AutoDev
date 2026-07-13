@@ -352,7 +352,11 @@ fn main() -> Result<()> {
             .context("--project is required when --dev-notes is enabled")?;
         let root =
             auto_dev_pipeline::git::paths::resolve_dev_notes_root(args.dev_notes_root.as_ref())?;
-        let reviews_dir = root.join(project).join("reviews");
+        let reviews_dir = {
+            auto_dev_pipeline::validation::validate_project_name(project)
+                .map_err(|e| anyhow::anyhow!(e))?;
+            root.join(project).join("reviews")
+        };
 
         // Find the most recent timestamp directory
         let latest_dir = fs::read_dir(&reviews_dir)

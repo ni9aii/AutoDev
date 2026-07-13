@@ -271,7 +271,11 @@ impl CiChecker {
         local_passed: bool,
         root: &std::path::Path,
     ) -> Result<()> {
-        let reports_dir = root.join(project).join("ci-reports");
+        let reports_dir = {
+            auto_dev_pipeline::validation::validate_project_name(project)
+                .map_err(|e| anyhow::anyhow!(e))?;
+            root.join(project).join("ci-reports")
+        };
         fs::create_dir_all(&reports_dir)?;
 
         let timestamp = chrono::Local::now().format("%Y%m%d_%H%M%S");
