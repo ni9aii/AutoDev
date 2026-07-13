@@ -1,0 +1,33 @@
+# Overlay for the repo-root SKILL.md (harness-agnostic / generic surface)
+# Rendered by tools/gen.py into ./SKILL.md
+frontmatter: |
+  name: autodev
+  description: "AutoDev: review → plan → execute → verify → release pipeline for your agent"
+  version: 1.0.0
+  author: ni9aii
+  license: MIT
+invoke: |
+  Load this SKILL.md into your harness (see README → "Install the skill into
+  your harness"), then invoke it so your agent drives the pipeline with its own
+  native tools.
+reviewers: |
+  Run the four reviewers (code, security, architecture, devops) with your
+  harness's subagent / parallel-execution mechanism. Each reads the sources and
+  writes its report to:
+
+  ```text
+  $DEV_NOTES_ROOT/<project>/reviews/<YYYY-MM-DD>-<role>-review-report.md
+  ```
+
+  Finding format per reviewer:
+
+  ```text
+  ### [CRITICAL] Title
+  Description. File: `path/to/file.rs`. Line: 42.
+  ```
+execute: |
+  - **Simple fixes** (≤2 files, ≤20 lines): apply directly with your harness's
+    read/edit tools.
+  - **Complex fixes**: delegate to a subagent.
+  Commit after each logical fix.
+install_path_hint: "any harness that can load SKILL.md + references/"
