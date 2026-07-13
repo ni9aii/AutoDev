@@ -309,6 +309,15 @@ pub mod git {
 }
 
 pub mod validation {
+    use once_cell::sync::Lazy;
+    use regex::Regex;
+
+    /// Semver-like version matcher, compiled once. Allows optional `v` prefix
+    /// and an optional pre-release suffix: v0.1.0, 1.0.0, v2.0.0-alpha.
+    static VERSION_RE: Lazy<Regex> = Lazy::new(|| {
+        Regex::new(r"^v?\d+\.\d+\.\d+(-[a-zA-Z0-9.]+)?$").expect("Invalid VERSION_RE pattern")
+    });
+
     /// Validate a version string for use in git tags and JSON payloads.
     /// Only allows semver-like strings: starts with optional 'v', then digits and dots.
     pub fn validate_version(version: &str) -> Result<(), String> {
@@ -316,10 +325,7 @@ pub mod validation {
         if clean.is_empty() {
             return Err("Version string is empty".to_string());
         }
-        // Allow v-prefixed semver: v0.1.0, 1.0.0, v2.0.0-alpha
-        let re = regex::Regex::new(r"^v?\d+\.\d+\.\d+(-[a-zA-Z0-9.]+)?$")
-            .map_err(|e| format!("Failed to compile version regex: {}", e))?;
-        if !re.is_match(clean) {
+        if !VERSION_RE.is_match(clean) {
             return Err(format!(
                 "Invalid version '{}'. Expected semver format: v0.1.0 or 1.0.0",
                 clean
