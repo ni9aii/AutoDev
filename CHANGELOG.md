@@ -11,6 +11,21 @@
   (including Hermes review instructions) now goes to stderr, so stdout stays
   clean for piping/parsing.
 - Unit test for `run-pipeline --json` output validity (`tests/integration.rs`).
+- Documentation overhaul for harness integrators:
+  - `README.md` / `SKILL.md` refactored to lead with skill installation, not CLI
+    usage.
+  - `references/skill-walkthrough.md` — phase-by-phase skill view.
+  - `references/dev-notes-schema.md` — exact dev-notes layout, artifact paths,
+    and finding format consumed by `review-aggregator`.
+  - `references/json-output.md` — `run-pipeline --json` output contract.
+  - `references/troubleshooting.md` — FAQ (Claude auth, empty reviews,
+    dev-notes not found, cargo build).
+  - `references/hermes-delegate-task-integration.md` rewritten to match the
+    current code (Hermes `delegate_task` + `read_file`/`patch`; no `claude -p`
+    in Hermes mode; correct `review-aggregator`/`ci-check` invocations).
+  - `references/iteration-2-patterns.md` trimmed to durable patterns (report
+    parser, Do Now/Defer, DevOps false-positive guard, regression checklist).
+  - `CONTRIBUTING.md` updated to cover skill/docs contributions, not just Rust.
 
 ### Fixed
 - `review-aggregator` no longer fails fatally when no review directories exist;
