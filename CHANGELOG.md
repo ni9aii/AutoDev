@@ -2,6 +2,24 @@
 
 ## [Unreleased]
 
+### Added
+- Integration tests (`tests/integration.rs`) — run `review-aggregator` against a
+  temp dev-notes tree and assert a plan is produced; also cover the no-reviews
+  case (generates an empty plan instead of failing).
+- `run-pipeline --json` emits a machine-readable summary (status, version,
+  project, phase, mode, timestamp, output_dir) on stdout. All human log output
+  (including Hermes review instructions) now goes to stderr, so stdout stays
+  clean for piping/parsing.
+- Unit test for `run-pipeline --json` output validity (`tests/integration.rs`).
+
+### Fixed
+- `review-aggregator` no longer fails fatally when no review directories exist;
+  it prints a warning and writes an empty plan (machine-readable, non-zero exit
+  avoided) so callers can handle an empty pipeline gracefully.
+- `review-aggregator` strips parser-metadata lines (`File:`, `Description:`,
+  `Line:`, `Source:`) from finding bodies, so the generated plan no longer
+  duplicates them inside the description section.
+
 ## [0.4.0] (pending — no release tag yet)
 
 ### Fixed (Known Limitations from 0.3.0)

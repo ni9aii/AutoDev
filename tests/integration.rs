@@ -1,0 +1,147 @@
+//! Integration tests for the Auto-Dev Pipeline binaries.
+//!
+//! These exercise the binaries end-to-end (real subprocess via CARGO_BIN_EXE_*)
+//! or through the `Pipeline` struct with a `MockRunner`, without requiring a
+//! live Claude Code CLI or network access.
+
+use std::fs;
+use std::path::PathBuf;
+use std::process::Command;
+
+/// A self-cleaning temporary directory under the system temp dir.
+struct TempDir {
+    path: PathBuf,
+}
+
+impl TempDir {
+    fn new(name: &str) -> Self {
+        let path = std::env::temp_dir().join(format!("autodev-it-{}-{}", name, std::process::id()));
+        let _ = fs::remove_dir_all(&path);
+        fs::create_dir_all(&path).expect("create temp dir");
+        TempDir { path }
+    }
+}
+
+impl Drop for TempDir {
+    fn drop(&mut self) {
+        let _ = fs::remove_dir_all(&self.path);
+    }
+}
+
+/// Fake review report in the format the aggregator's parser understands
+/// (### [SEVERITY] Title + File:/Description: body). The body deliberately
+/// repeats "File:" / "Description:" lead-ins to verify the aggregator strips
+/// them from the description (no duplication in the generated plan).
+const FAKE_REVIEW: &str = r#"# Code Review Report
+
+### [CRITICAL] SQL injection in db.rs
+File: `src/db.rs`
+Description: User input concatenated into a query string without parameterization.
+File: `src/db.rs`
+Description: This is a duplicate metadata line that must be stripped.
+
+### [IMPORTANT] Missing error handling in main.rs
+File: `src/main.rs`
+Description: `unwrap()` on a fallible call can panic at runtime.
+"#;
+
+/// Run `review-aggregator` against a temp dev-notes tree and assert a plan is
+/// produced with the expected sections.
+#[test]
+fn integration_review_aggregator_produces_plan() {
+    let td = TempDir::new("aggregator");
+    let project = "testproj";
+    let timestamp = "20260101_000000";
+    let reviews_dir = td.path.join(project).join("reviews").join(timestamp);
+    fs::create_dir_all(&reviews_dir).unwrap();
+    fs::write(reviews_dir.join("code-review.md"), FAKE_REVIEW).unwrap();
+
+    let status = Command::new(env!("CARGO_BIN_EXE_review-aggregator"))
+        .args([
+            "--dev-notes",
+            "--dev-notes-root",
+            td.path.to_str().unwrap(),
+            "--project",
+            project,
+        ])
+        .status()
+        .expect("spawn review-aggregator");
+
+    assert!(status.success(), "review-aggregator exited non-zero");
+
+    let plan_path = td
+        .path
+        .join(project)
+        .join("plans")
+        .join(format!("{}-plan.md", timestamp));
+    assert!(plan_path.exists(), "plan file not created at {:?}", plan_path);
+
+    let plan = fs::read_to_string(&plan_path).unwrap();
+    assert!(plan.contains("Do Now"), "plan missing 'Do Now' section");
+    assert!(plan.contains("SQL injection"), "plan missing aggregated finding");
+    assert!(plan.contains("CRITICAL"), "plan missing severity label");
+    // The aggregator must strip parser-metadata lines (File:/Description:) from
+    // the description body, so the generated plan must not duplicate them.
+    // FAKE_REVIEW has 2 findings, both with a File:, so expect exactly 2 (one per
+    // finding), not 4 (which would mean the body metadata leaked through).
+    let file_count = plan.matches("**File:**").count();
+    let desc_count = plan.matches("**Description:**").count();
+    assert_eq!(file_count, 2, "File: metadata count wrong (leak/dup?)");
+    assert_eq!(desc_count, 2, "Description: metadata count wrong (leak/dup?)");
+    assert!(
+        !plan.contains("This is a duplicate metadata line"),
+        "duplicate metadata line leaked into plan"
+    );
+}
+
+/// Run `review-aggregator` when there are no reviews: it should still succeed
+/// and create an empty/placeholder plan rather than panic.
+#[test]
+fn integration_review_aggregator_no_reviews_is_ok() {
+    let td = TempDir::new("aggregator-empty");
+    let project = "empty";
+    fs::create_dir_all(td.path.join(project).join("reviews")).unwrap();
+
+    let status = Command::new(env!("CARGO_BIN_EXE_review-aggregator"))
+        .args([
+            "--dev-notes",
+            "--dev-notes-root",
+            td.path.to_str().unwrap(),
+            "--project",
+            project,
+        ])
+        .status()
+        .expect("spawn review-aggregator");
+
+    assert!(status.success(), "review-aggregator should handle empty input");
+}
+
+/// Run `run-pipeline` with `--json` and assert stdout is valid JSON with the
+/// expected top-level fields (logs go to stderr, so stdout is JSON-only).
+#[test]
+fn integration_run_pipeline_json_is_valid() {
+    let td = TempDir::new("run-json");
+    // Point dev-notes at a temp dir so the run doesn't touch real notes.
+    let status = Command::new(env!("CARGO_BIN_EXE_run-pipeline"))
+        .args([
+            ".",
+            "review",
+            "--hermes-mode",
+            "--json",
+            "--dev-notes-root",
+            td.path.to_str().unwrap(),
+        ])
+        .output()
+        .expect("spawn run-pipeline");
+
+    assert!(status.status.success(), "run-pipeline exited non-zero");
+
+    let stdout = String::from_utf8_lossy(&status.stdout);
+    let value: serde_json::Value = serde_json::from_str(stdout.trim())
+        .expect("stdout is not valid JSON");
+    assert_eq!(value["status"], "success");
+    assert_eq!(value["phase"], "review");
+    assert_eq!(value["mode"], "hermes");
+    assert!(value["version"].is_string());
+    assert!(value["output_dir"].is_string());
+}

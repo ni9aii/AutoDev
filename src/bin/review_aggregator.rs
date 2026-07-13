@@ -32,6 +32,23 @@ static LINE_RE: Lazy<Regex> = Lazy::new(|| {
     Regex::new(r"(?i)[Ll]ine:\s*(\d+)").expect("Invalid LINE_RE pattern")
 });
 
+/// Matches "Description:" / "File:" / "Line:" lead-in lines that are parser
+/// metadata, not part of the actual finding description.
+static META_RE: Lazy<Regex> = Lazy::new(|| {
+    Regex::new(r"(?im)^\s*(File|Description|Line|Source)\s*:\s*").expect("Invalid META_RE pattern")
+});
+
+/// Strips parser-metadata lines (File:, Description:, Line:, Source:) from a
+/// finding body so the generated plan does not duplicate them.
+fn clean_body(body: &str) -> String {
+    body.lines()
+        .filter(|l| !META_RE.is_match(l))
+        .collect::<Vec<_>>()
+        .join("\n")
+        .trim()
+        .to_string()
+}
+
 /// Review Aggregator for Auto-Dev Pipeline
 /// Aggregates findings from reviewers and generates prioritized fix plan
 #[derive(Parser, Debug)]
@@ -157,7 +174,7 @@ fn parse_review_file(filepath: &Path) -> Result<Vec<Finding>> {
             role: role.clone(),
             severity,
             title,
-            description: body,
+            description: clean_body(&body),
             file,
             line,
             classification,
@@ -341,14 +358,22 @@ fn main() -> Result<()> {
             .map(|e| e.path())
             .max();
 
-        let input_dir = latest_dir.with_context(|| {
-            format!("No review directories found in {}", reviews_dir.display())
-        })?;
-
-        let timestamp = input_dir
-            .file_name()
-            .and_then(|n| n.to_str())
-            .unwrap_or("unknown");
+        let (input_dir, timestamp) = match latest_dir {
+            Some(dir) => (
+                dir.clone(),
+                dir.file_name()
+                    .and_then(|n| n.to_str())
+                    .unwrap_or("unknown")
+                    .to_string(),
+            ),
+            None => {
+                eprintln!(
+                    "[auto-dev] WARNING: No review directories found in {} — generating empty plan",
+                    reviews_dir.display()
+                );
+                (reviews_dir.clone(), "empty".to_string())
+            }
+        };
         let plans_dir = root.join(project).join("plans");
         fs::create_dir_all(&plans_dir)?;
         let output_path = plans_dir.join(format!("{}-plan.md", timestamp));
