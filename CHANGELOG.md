@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.7.1] - 2026-07-14
+
+### Fixed
+- `install.sh --check` tested the install *directory* instead of `SKILL.md`,
+  so it reported MISSING even after a successful install. Now checks
+  `$DST/SKILL.md`.
+- `install.sh` honors `AUTODEV_INSTALL_ROOT` to override the base dir (custom
+  install locations and CI).
+- CI `gen-check` functional step now installs into a temp root and asserts
+  `--check` returns 0 when present and 1 when absent (previously it only ever
+  observed the absent case, masking the bug above).
+
 ## [0.7.0] - 2026-07-14
 
 ### Added
