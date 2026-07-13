@@ -232,6 +232,7 @@ mod tests {
             timestamp: "20260101_000000".to_string(),
             output_dir: StdPathBuf::from("."),
             dev_notes_root: StdPathBuf::from("."),
+            json: false,
             runner: Box::new(SystemRunner),
         }
     }
@@ -299,6 +300,7 @@ mod tests {
             timestamp: "20260101_000000".to_string(),
             output_dir: StdPathBuf::from("."),
             dev_notes_root: StdPathBuf::from("."),
+            json: false,
             runner: Box::new(mock),
         };
         pipeline.execute_via_claude("do the thing").unwrap();

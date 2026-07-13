@@ -333,6 +333,7 @@ mod tests {
             timestamp: "20260101_000000".to_string(),
             output_dir: StdPathBuf::from("."),
             dev_notes_root: StdPathBuf::from("."),
+            json: false,
             runner: Box::new(mock),
         };
         assert!(pipeline.check_claude_auth().is_ok());
@@ -353,6 +354,7 @@ mod tests {
             timestamp: "20260101_000000".to_string(),
             output_dir: StdPathBuf::from("."),
             dev_notes_root: StdPathBuf::from("."),
+            json: false,
             runner: Box::new(mock),
         };
         assert!(pipeline.check_claude_auth().is_err());
@@ -371,6 +373,7 @@ mod tests {
             timestamp: "20260101_000000".to_string(),
             output_dir: StdPathBuf::from("."),
             dev_notes_root: StdPathBuf::from("."),
+            json: false,
             runner: Box::new(mock),
         };
         assert!(pipeline.check_claude_auth().is_err());
