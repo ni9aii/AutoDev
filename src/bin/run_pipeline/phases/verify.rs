@@ -2,23 +2,6 @@ use crate::Pipeline;
 use anyhow::{Context, Result};
 use auto_dev_pipeline::{log, test_runner};
 
-/// Resolve the `ci-check` companion binary.
-///
-/// Same rationale as `resolve_aggregator`: prefer the binary sitting next to
-/// the running executable (works under `cargo test`/`target/`), fall back to
-/// the bare name for `$PATH` installs.
-fn resolve_ci_check() -> String {
-    if let Ok(exe) = std::env::current_exe() {
-        if let Some(dir) = exe.parent() {
-            let candidate = dir.join("ci-check");
-            if candidate.is_file() {
-                return candidate.display().to_string();
-            }
-        }
-    }
-    "ci-check".to_string()
-}
-
 impl Pipeline {
     pub(crate) fn run_verify_phase(&self) -> Result<()> {
         log::log("=== PHASE 4: VERIFY ===");
@@ -41,7 +24,9 @@ impl Pipeline {
 
         let arg_refs: Vec<&str> = args.iter().map(|s| s.as_str()).collect();
 
-        let ci_check = resolve_ci_check();
+        let ci_check = auto_dev_pipeline::bin_contract::resolve_companion(
+            auto_dev_pipeline::bin_contract::CI_CHECK,
+        );
         let ci_output = self
             .runner
             .run(&ci_check, &arg_refs, None)
