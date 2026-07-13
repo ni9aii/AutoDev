@@ -144,16 +144,12 @@ Run the four reviewers (code, security, architecture, devops) as **parallel
 `delegate_task` subagents** (one at a time if rate limits are tight). Each
 reads the sources and writes its report to:
 
-```text
 $DEV_NOTES_ROOT/<project>/reviews/<YYYY-MM-DD>-<role>-review-report.md
-```
 
 Finding format per reviewer:
 
-```text
 ### [CRITICAL] Title
 Description. File: `path/to/file.rs`. Line: 42.
-```
 
 ### `plan` — aggregation
 
@@ -177,7 +173,7 @@ Read the latest plan from `$DEV_NOTES_ROOT/<project>/plans/`. For each fix in th
 
 - **Simple fixes** (≤2 files, ≤20 lines): `read_file` + `patch` directly.
 - **Complex fixes**: `delegate_task` subagent.
-Commit after each logical fix (the skill's git-sync handles push on session end).
+  Commit after each logical fix (the skill's git-sync handles push on session end).
 
 ### `full` — full pipeline
 
@@ -237,4 +233,4 @@ $DEV_NOTES_ROOT/
 
 This skill is distributed via the repo's `install.sh` (one command, auto-detects
 your harness) or by copying the generated `SKILL.md` into your harness's skill
-directory (currently: ``).
+directory (currently: `~/.hermes/skills/autonomous-ai-agents/autodev/ (via git-sync, or copy SKILL.md there)`).

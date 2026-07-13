@@ -136,13 +136,10 @@ Launch the four reviewers (code, security, architecture, devops) as **4
 parallel sub-agents via the Workflow tool**. Each reads the sources and writes
 its report to:
 
-```text
 $DEV_NOTES_ROOT/<project>/reviews/<YYYY-MM-DD>-<role>-review-report.md
-```
 
 Prompt each sub-agent:
 
-```text
 You are the <role> Reviewer. Check the project at <project-path>.
 Read all source files. Write the report in this format:
 
@@ -152,7 +149,6 @@ Description. File: `path/to/file.rs`. Line: 42.
 ### [MINOR] ...
 
 Save to: <output-path>
-```
 
 ### `plan` — aggregation
 
@@ -176,8 +172,8 @@ Read the latest plan from `$DEV_NOTES_ROOT/<project>/plans/`. For each fix in th
 
 - **Simple fixes** (≤2 files, ≤20 lines): apply directly with Read/Edit.
 - **Complex fixes**: delegate to an `Agent` sub-agent.
-Commit after each fix; push promptly. Do NOT add a `Co-Authored-By: Claude`
-trailer to commits.
+  Commit after each fix; push promptly. Do NOT add a `Co-Authored-By: Claude`
+  trailer to commits.
 
 ### `full` — full pipeline
 
@@ -237,4 +233,4 @@ $DEV_NOTES_ROOT/
 
 This skill is distributed via the repo's `install.sh` (one command, auto-detects
 your harness) or by copying the generated `SKILL.md` into your harness's skill
-directory (currently: ``).
+directory (currently: `~/.claude/skills/autodev/ (via install.sh or copy SKILL.md there)`).
