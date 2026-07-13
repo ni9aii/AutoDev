@@ -1,9 +1,18 @@
 ---
 name: autodev
-description: "AutoDev: review → plan → execute → verify → release pipeline for your agent"
+description: "AutoDev MVP: automated review → plan → execute → verify pipeline. All tasks run inside Hermes Agent via delegate_task. Rust binaries are optional accelerators."
 version: 1.0.0
 author: ni9aii
 license: MIT
+platforms: [linux, windows, macos]
+metadata:
+  hermes:
+    tags: [AutoDev, Pipeline, Review, Code-Quality, CI, Automation, Rust]
+    related_skills: [autonomous-ai-agents]
+    quick_commands:
+      - name: autodev
+        description: "Run full AutoDev pipeline on a project"
+        example: "/autodev /path/to/project"
 ---
 
 # AutoDev Pipeline — Agent Skill
@@ -35,9 +44,8 @@ follow what's documented here. This file is **generated** from `SKILL.core.md`
 
 ## Invocation
 
-Load this SKILL.md into your harness (see README → "Install the skill into
-your harness"), then invoke it so your agent drives the pipeline with its own
-native tools.
+Load the skill with `/skill autodev` (or `/autodev` if mapped as a quick
+command), then provide the project path and phase.
 
 ## What This Skill Does
 
@@ -132,9 +140,9 @@ GitHub Actions with an ubuntu + windows matrix:
 
 ### `review` — reviewers
 
-Run the four reviewers (code, security, architecture, devops) with your
-harness's subagent / parallel-execution mechanism. Each reads the sources and
-writes its report to:
+Run the four reviewers (code, security, architecture, devops) as **parallel
+`delegate_task` subagents** (one at a time if rate limits are tight). Each
+reads the sources and writes its report to:
 
 ```text
 $DEV_NOTES_ROOT/<project>/reviews/<YYYY-MM-DD>-<role>-review-report.md
@@ -167,10 +175,9 @@ Result: a plan in `$DEV_NOTES_ROOT/<project>/plans/<timestamp>-plan.md` with
 Read the latest plan from `$DEV_NOTES_ROOT/<project>/plans/`. For each fix in the
 "Do Now" section:
 
-- **Simple fixes** (≤2 files, ≤20 lines): apply directly with your harness's
-  read/edit tools.
-- **Complex fixes**: delegate to a subagent.
-Commit after each logical fix.
+- **Simple fixes** (≤2 files, ≤20 lines): `read_file` + `patch` directly.
+- **Complex fixes**: `delegate_task` subagent.
+Commit after each logical fix (the skill's git-sync handles push on session end).
 
 ### `full` — full pipeline
 
