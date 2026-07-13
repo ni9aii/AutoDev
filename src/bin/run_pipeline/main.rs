@@ -33,7 +33,7 @@ impl std::fmt::Display for Phase {
 /// Auto-Dev Pipeline Entry Point
 /// Orchestrates: review → aggregate → execute → verify
 #[derive(Parser, Debug)]
-#[command(name = "run-pipeline", version = "1.1.0", about = "Auto-Dev Pipeline", disable_version_flag = true)]
+#[command(name = "run-pipeline", version = env!("CARGO_PKG_VERSION"), about = "Auto-Dev Pipeline", disable_version_flag = true)]
 struct Args {
     /// Project path
     #[arg(default_value = ".")]
@@ -55,7 +55,7 @@ struct Args {
     #[arg(long)]
     project: Option<String>,
 
-    /// Root directory for dev-notes (overrides $DEV_NOTES_ROOT and ~/dev-notes default)
+    /// Root directory for dev-notes (overrides $DEV_NOTES_ROOT and ~/obsidian-vault/dev-notes default)
     #[arg(long)]
     dev_notes_root: Option<PathBuf>,
 }
@@ -72,7 +72,7 @@ struct Pipeline {
     runner: Box<dyn ProcessRunner>,
 }
 
-/// Resolve dev-notes root: --dev-notes-root > $DEV_NOTES_ROOT > ~/dev-notes
+/// Resolve dev-notes root: --dev-notes-root > $DEV_NOTES_ROOT > ~/obsidian-vault/dev-notes
 fn resolve_dev_notes_root(override_path: Option<&PathBuf>) -> Result<PathBuf> {
     if let Some(p) = override_path {
         return Ok(p.clone());
@@ -81,7 +81,7 @@ fn resolve_dev_notes_root(override_path: Option<&PathBuf>) -> Result<PathBuf> {
         return Ok(PathBuf::from(env_root));
     }
     let home = dirs::home_dir().context("Could not determine home directory")?;
-    Ok(home.join("dev-notes"))
+    Ok(home.join("obsidian-vault").join("dev-notes"))
 }
 
 impl Pipeline {
@@ -152,7 +152,7 @@ impl Pipeline {
     }
 
     fn run(&self) -> Result<()> {
-        log::log("Auto-Dev Pipeline v1.1.0 (Rust)");
+        log::log(&format!("Auto-Dev Pipeline v{} (Rust)", env!("CARGO_PKG_VERSION")));
         log::log(&format!("Project: {}", self.project_path.display()));
         log::log(&format!("Phase: {}", self.phase));
         log::log(&format!("Mode: {}", if self.hermes_mode { "Hermes (delegate_task)" } else { "Legacy (Claude CLI)" }));
