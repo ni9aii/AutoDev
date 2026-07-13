@@ -2,7 +2,9 @@
 
 [![CI](https://github.com/ni9aii/AutoDev/actions/workflows/ci.yml/badge.svg)](https://github.com/ni9aii/AutoDev/actions/workflows/ci.yml)
 
-![AutoDev logo](logo.png)
+<p align="center">
+  <img src="logo.png" alt="AutoDev logo" width="256">
+</p>
 
 Automated development pipeline: review → plan → execute → verify → release.
 
