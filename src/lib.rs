@@ -46,7 +46,7 @@ pub mod process {
     use std::cell::RefCell;
     use std::collections::VecDeque;
     use std::path::{Path, PathBuf};
-    use std::process::{Command, ExitStatus, Output};
+    use std::process::{Command, Output};
 
     /// Resolve an executable name to an absolute path via `$PATH`, so callers
     /// never hand a bare name to `Command::new` (which trusts whatever the
