@@ -249,22 +249,23 @@ pub mod git {
 
     pub mod paths {
         use anyhow::{Context, Result};
-        use std::path::Path;
+        use std::path::PathBuf;
 
-        /// Validate and canonicalize a project path
-        /// Returns Ok(canonical_path) or Err with descriptive message
-        pub fn validate_project_path(path: &Path) -> Result<std::path::PathBuf> {
-            let canonical = std::fs::canonicalize(path)
-                .with_context(|| format!("Invalid project path: {}", path.display()))?;
-
-            if !canonical.join(".git").exists() && !canonical.join("Cargo.toml").exists() {
-                anyhow::bail!(
-                    "Not a project directory (missing .git or Cargo.toml): {}",
-                    canonical.display()
-                );
+        /// Resolve the dev-notes root directory.
+        ///
+        /// Precedence: explicit `--dev-notes-root` override > `$DEV_NOTES_ROOT`
+        /// env var > `~/obsidian-vault/dev-notes` default. Shared by all three
+        /// binaries (`run-pipeline`, `review-aggregator`, `ci-check`) so their
+        /// behaviour can't drift.
+        pub fn resolve_dev_notes_root(override_path: Option<&PathBuf>) -> Result<PathBuf> {
+            if let Some(p) = override_path {
+                return Ok(p.clone());
             }
-
-            Ok(canonical)
+            if let Ok(env_root) = std::env::var("DEV_NOTES_ROOT") {
+                return Ok(PathBuf::from(env_root));
+            }
+            let home = dirs::home_dir().context("Could not determine home directory")?;
+            Ok(home.join("obsidian-vault").join("dev-notes"))
         }
     }
 

@@ -78,18 +78,6 @@ struct Pipeline {
     runner: Box<dyn ProcessRunner>,
 }
 
-/// Resolve dev-notes root: --dev-notes-root > $DEV_NOTES_ROOT > ~/obsidian-vault/dev-notes
-fn resolve_dev_notes_root(override_path: Option<&PathBuf>) -> Result<PathBuf> {
-    if let Some(p) = override_path {
-        return Ok(p.clone());
-    }
-    if let Ok(env_root) = std::env::var("DEV_NOTES_ROOT") {
-        return Ok(PathBuf::from(env_root));
-    }
-    let home = dirs::home_dir().context("Could not determine home directory")?;
-    Ok(home.join("obsidian-vault").join("dev-notes"))
-}
-
 impl Pipeline {
     fn new(args: Args) -> Result<Self> {
         let timestamp = chrono::Local::now().format("%Y%m%d_%H%M%S").to_string();
@@ -98,7 +86,8 @@ impl Pipeline {
         let project_path = std::fs::canonicalize(&args.project_path)
             .with_context(|| format!("Invalid project path: {}", args.project_path.display()))?;
 
-        let dev_notes_root = resolve_dev_notes_root(args.dev_notes_root.as_ref())?;
+        let dev_notes_root =
+            auto_dev_pipeline::git::paths::resolve_dev_notes_root(args.dev_notes_root.as_ref())?;
 
         let output_dir = if args.hermes_mode {
             let project = args
