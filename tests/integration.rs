@@ -31,12 +31,15 @@ impl Drop for TempDir {
 /// Fake review report in the format the aggregator's parser understands
 /// (### [SEVERITY] Title + File:/Description: body). The body deliberately
 /// repeats "File:" / "Description:" lead-ins to verify the aggregator strips
-/// them from the description (no duplication in the generated plan).
+/// them from the description (no duplication in the generated plan), and uses a
+/// multi-line description so we also catch the clean_body prefix-strip bug
+/// (the first line after "Description:" must be preserved, not dropped).
 const FAKE_REVIEW: &str = r#"# Code Review Report
 
 ### [CRITICAL] SQL injection in db.rs
 File: `src/db.rs`
 Description: User input concatenated into a query string without parameterization.
+This second line must also survive aggregation.
 File: `src/db.rs`
 Description: This is a duplicate metadata line that must be stripped.
 
@@ -99,8 +102,19 @@ fn integration_review_aggregator_produces_plan() {
         "Description: metadata count wrong (leak/dup?)"
     );
     assert!(
-        !plan.contains("This is a duplicate metadata line"),
-        "duplicate metadata line leaked into plan"
+        !plan.contains("**Description:** This is a duplicate metadata line"),
+        "duplicate metadata line leaked into plan body"
+    );
+    // clean_body must strip the "Description:" prefix but KEEP the text that
+    // follows it — including the first line. Regression guard for the
+    // prefix-strip bug where the whole first line was dropped.
+    assert!(
+        plan.contains("User input concatenated into a query string"),
+        "first line of description was dropped by clean_body"
+    );
+    assert!(
+        plan.contains("This second line must also survive aggregation"),
+        "multi-line description body was not preserved"
     );
 }
 
@@ -157,4 +171,49 @@ fn integration_run_pipeline_json_is_valid() {
     assert_eq!(value["mode"], "hermes");
     assert!(value["version"].is_string());
     assert!(value["output_dir"].is_string());
+}
+
+/// End-to-end: `run-pipeline <git-repo> plan` must pass the git prerequisite
+/// check and produce a plan file (empty when there are no reviews). Exercises
+/// the full binary path: arg parse → prerequisites → aggregate phase.
+#[test]
+fn integration_run_pipeline_plan_end_to_end() {
+    let td = TempDir::new("run-plan");
+    let project = "e2e";
+    // run-pipeline requires the target to be a git repository.
+    let init = Command::new("git")
+        .args(["init", "-q"])
+        .current_dir(&td.path)
+        .status()
+        .expect("git init");
+    assert!(init.success(), "git init failed");
+
+    fs::create_dir_all(td.path.join(project).join("reviews")).unwrap();
+
+    let status = Command::new(env!("CARGO_BIN_EXE_run-pipeline"))
+        .args([
+            td.path.to_str().unwrap(),
+            "plan",
+            "--hermes-mode",
+            "--dev-notes-root",
+            td.path.to_str().unwrap(),
+            "--project",
+            project,
+        ])
+        .output()
+        .expect("spawn run-pipeline");
+
+    assert!(status.status.success(), "run-pipeline plan exited non-zero");
+
+    // A plan file should have been written under <root>/<project>/plans/.
+    let plans_dir = td.path.join(project).join("plans");
+    assert!(plans_dir.exists(), "plans dir not created");
+    let mut plans: Vec<_> = fs::read_dir(&plans_dir)
+        .unwrap()
+        .filter_map(|e| e.ok())
+        .collect();
+    plans.sort_by_key(|e| e.file_name());
+    assert!(!plans.is_empty(), "no plan file written");
+    let plan = fs::read_to_string(plans[0].path()).unwrap();
+    assert!(plan.contains("Auto-Dev Fix Plan"), "plan content unexpected");
 }
