@@ -15,22 +15,26 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 GEN="$ROOT/tools/gen.sh"
 
+# Base directory for installs. Override with AUTODEV_INSTALL_ROOT (used by CI
+# and for custom install locations); defaults to $HOME.
+INSTALL_ROOT="${AUTODEV_INSTALL_ROOT:-$HOME}"
+
 HARNESSES=( hermes claude-code )
 
-# harness -> default install directory
+# harness -> default install directory (under INSTALL_ROOT)
 install_dir() {
   case "$1" in
-    hermes)      echo "$HOME/.hermes/skills/autonomous-ai-agents/autodev" ;;
-    claude-code) echo "$HOME/.claude/skills/autodev" ;;
+    hermes)      echo "$INSTALL_ROOT/.hermes/skills/autonomous-ai-agents/autodev" ;;
+    claude-code) echo "$INSTALL_ROOT/.claude/skills/autodev" ;;
     *) echo "" ;;
   esac
 }
 
 detect_harness() {
-  if [ -d "$HOME/.hermes/skills" ] || command -v hermes >/dev/null 2>&1; then
+  if [ -d "$INSTALL_ROOT/.hermes/skills" ] || command -v hermes >/dev/null 2>&1; then
     echo hermes; return
   fi
-  if [ -d "$HOME/.claude/skills" ] || command -v claude >/dev/null 2>&1; then
+  if [ -d "$INSTALL_ROOT/.claude/skills" ] || command -v claude >/dev/null 2>&1; then
     echo claude-code; return
   fi
   echo ""
@@ -44,6 +48,9 @@ Usage: ./install.sh [--harness H | --list | --check]
   --harness H install for harness H (hermes | claude-code)
   --list      list supported harnesses
   --check     verify install without changing anything
+
+  Env: AUTODEV_INSTALL_ROOT overrides the base dir (default $HOME).
+       e.g. AUTODEV_INSTALL_ROOT=/tmp/test ./install.sh --harness claude-code
 EOF
 }
 
@@ -95,11 +102,11 @@ if [ ! -f "$SRC" ]; then
 fi
 
 if [ "$MODE" = "check" ]; then
-  if [ -f "$DST" ]; then
-    echo "OK: $DST exists"
+  if [ -f "$DST/SKILL.md" ]; then
+    echo "OK: $DST/SKILL.md exists"
     exit 0
   else
-    echo "MISSING: $DST (run ./install.sh --harness $HARNESS to install)"
+    echo "MISSING: $DST/SKILL.md (run ./install.sh --harness $HARNESS to install)"
     exit 1
   fi
 fi
