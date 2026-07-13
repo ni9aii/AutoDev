@@ -1,5 +1,25 @@
 # Changelog
 
+## [0.5.0] - 2026-07-13
+
+### Added
+- Typed `Severity` enum (`auto_dev_pipeline::severity`) with `FromStr`,
+  `Display`, and severity ordering (`Critical` < `Important` < `Minor`),
+  replacing hand-written string ladders in the aggregator's ordering and
+  classification paths.
+- Test coverage for the release phase (`run_release_phase`): version
+  validation rejection, build-failure abort, and tag-failure abort (via
+  `MockRunner`, no network).
+- Test coverage for `parse_review_file`: `File:`/`Line:` and reviewer-role
+  extraction, plus self-correction skip markers.
+
+### Changed
+- `validation::validate_version` compiles its semver regex once via
+  `once_cell::Lazy` instead of on every call.
+- `review-aggregator` ordering (`prioritize_findings`) and classification
+  (`classify_finding`) now parse severities through the typed `Severity`
+  enum rather than matching raw strings.
+
 ## [0.4.0] - 2026-07-13
 
 ### Added
