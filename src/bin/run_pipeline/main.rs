@@ -305,7 +305,7 @@ fn main() -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use auto_dev_pipeline::process::{mock_output, MockRunner, ProcessRunner};
+    use auto_dev_pipeline::process::{mock_output, MockRunner};
     use std::path::PathBuf as StdPathBuf;
 
     #[test]
