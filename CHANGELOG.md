@@ -1,6 +1,6 @@
 # Changelog
 
-## [Unreleased]
+## [0.4.0] - 2026-07-13
 
 ### Added
 - `examples/` — a fully worked sample: four review reports
@@ -17,6 +17,14 @@
   Rust scripts are optional accelerators).
 
 ### Fixed
+- Companion-binary resolution — `run-pipeline` resolved the sibling
+  `review-aggregator` (aggregate phase) and `ci-check` (verify phase) by bare
+  name, requiring them on `$PATH`. Under `cargo test` in CI the siblings live
+  in `target/debug/` and aren't on `$PATH`, so the plan E2E test passed
+  locally but failed in CI. Both call sites now resolve the companion next to
+  `std::env::current_exe()` first, falling back to the bare name for `$PATH`
+  installs — fixing red CI and making full/release phases robust when the
+  binaries aren't installed.
 - `review-aggregator` description parsing: `File:`/`Line:`/`Source:` lines are
   now dropped entirely from the body (their value is already in structured
   fields), while `Description:` keeps its text with only the prefix stripped —
@@ -73,7 +81,8 @@
   `Line:`, `Source:`) from finding bodies, so the generated plan no longer
   duplicates them inside the description section.
 
-## [0.4.0] (pending — no release tag yet)
+## [0.4.0] — earlier fixes (Known Limitations from 0.3.0)
+<!-- Consolidated into the 0.4.0 release above; kept for detail. -->
 
 ### Fixed (Known Limitations from 0.3.0)
 - PATH hijack risk — all bare `Command::new("claude"/"cargo"/"git"/"gh"/...)`
