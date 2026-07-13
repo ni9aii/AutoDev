@@ -1,0 +1,35 @@
+@@FRONTMATTER@@
+name: autodev
+description: "AutoDev: automated review → plan → execute → verify pipeline for Claude Code"
+version: 1.0.0
+author: ni9aii
+license: MIT
+@@INVOKE@@
+Invoke from Claude Code with `/autodev [review|plan|execute|full] <project-name> [project-path]`.
+- `project-name` — matches the directory under `dev-notes`.
+- `project-path` — path to the repo (defaults to the current directory).
+@@REVIEWERS@@
+Launch the four reviewers (code, security, architecture, devops) as **4
+parallel sub-agents via the Workflow tool**. Each reads the sources and writes
+its report to:
+
+$DEV_NOTES_ROOT/<project>/reviews/<YYYY-MM-DD>-<role>-review-report.md
+
+Prompt each sub-agent:
+
+You are the <role> Reviewer. Check the project at <project-path>.
+Read all source files. Write the report in this format:
+
+### [CRITICAL] Title
+Description. File: `path/to/file.rs`. Line: 42.
+### [IMPORTANT] ...
+### [MINOR] ...
+
+Save to: <output-path>
+@@EXECUTE@@
+- **Simple fixes** (≤2 files, ≤20 lines): apply directly with Read/Edit.
+- **Complex fixes**: delegate to an `Agent` sub-agent.
+  Commit after each fix; push promptly. Do NOT add a `Co-Authored-By: Claude`
+  trailer to commits.
+@@INSTALL_PATH_HINT@@
+~/.claude/skills/autodev/ (via install.sh or copy SKILL.md there)

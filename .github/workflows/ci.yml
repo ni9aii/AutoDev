@@ -76,3 +76,23 @@ jobs:
             target/release/run-pipeline*
             target/release/ci-check*
             target/release/review-aggregator*
+
+  gen-check:
+    name: Skill generator drift check
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Re-render skill surfaces
+        run: bash tools/gen.sh
+
+      - name: Fail if any rendered skill drifted from source
+        run: |
+          if ! git diff --exit-code -- SKILL.md skills/hermes/SKILL.md skills/claude-code/SKILL.md skills/hermes/references skills/claude-code/references; then
+            echo "::error::Rendered skills drifted from SKILL.core.md/harnesses/*.overlay."
+            echo "Run 'bash tools/gen.sh' locally and commit the result."
+            exit 1
+          fi
+          echo "Skill surfaces are in sync with source."
