@@ -676,8 +676,12 @@ mod tests {
 
     #[test]
     fn test_resolve_exe_finds_known_binary() {
-        // "sh" is guaranteed present in any POSIX environment CI runs in.
-        let resolved = process::resolve_exe("sh").expect("sh should be on PATH");
+        // A shell present on the running OS: `sh` on Unix, `cmd` on Windows.
+        #[cfg(unix)]
+        let name = "sh";
+        #[cfg(windows)]
+        let name = "cmd";
+        let resolved = process::resolve_exe(name).expect("known shell should be on PATH");
         assert!(resolved.is_absolute());
         assert!(resolved.is_file());
     }
