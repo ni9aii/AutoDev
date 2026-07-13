@@ -39,37 +39,65 @@ and a machine-readable [`--json` summary](examples/json-output.json).
 
 ## Install the skill into your harness
 
-The skill is the product. Pick the integration that matches your agent:
-
-### Hermes Agent (reference integration)
+The skill is the product. The fastest path is the one-command installer:
 
 ```bash
-# Copy the skill into your Hermes skills dir
-cp -r /path/to/AutoDev ~/.hermes/skills/autodev
+# From a checkout of this repo:
+./install.sh                 # auto-detects your harness, installs there
+./install.sh --harness hermes      # or force a specific harness
+./install.sh --harness claude-code
+./install.sh --list          # show supported harnesses + install paths
+./install.sh --check         # verify an install without changing anything
 ```
 
-Then invoke it from a session with `/skill autodev`. The skill orchestrates the
-whole pipeline using Hermes native tools (`delegate_task`, `read_file`,
-`patch`, `terminal`).
+`install.sh` re-renders the skill from `SKILL.core.md` + `harnesses/*.overlay`
+(see "How the skill is built" below) and copies the right `SKILL.md` (with its
+`references/`) into your harness's skill directory. Currently supported:
 
-### Claude Code
+| Harness      | Install path                                      | Invoke with        |
+|--------------|---------------------------------------------------|--------------------|
+| Hermes       | `~/.hermes/skills/autonomous-ai-agents/autodev`  | `/skill autodev`  |
+| Claude Code  | `~/.claude/skills/autodev`                        | `/autodev`         |
 
-Use the dedicated Claude Code skill surface:
+After install, load the skill in your agent and run a phase, e.g.
+`/autodev /path/to/project review`.
+
+### Manual install (alternative)
+
+If you prefer not to run the script, copy the rendered skill by hand — the
+installer does exactly this:
 
 ```bash
-cp skills/claude-code/SKILL.md /path/to/your-claude-skills/autodev/SKILL.md
+# Hermes
+cp skills/hermes/SKILL.md ~/.hermes/skills/autonomous-ai-agents/autodev/SKILL.md
+cp -r skills/hermes/references   ~/.hermes/skills/autonomous-ai-agents/autodev/
+
+# Claude Code
+cp skills/claude-code/SKILL.md ~/.claude/skills/autodev/SKILL.md
+cp -r skills/claude-code/references ~/.claude/skills/autodev/
 ```
-
-### Any other harness
-
-Point your harness at `SKILL.md` in this repo (and keep the `references/`
-folder alongside it for the deep-dive guides). AutoDev needs only your agent's
-native capabilities — file read/write, shell, and (optionally) subagents.
-**No external binaries are required** to run the pipeline end to end.
 
 > **That's it.** There is nothing to "run" from a terminal to use AutoDev — you
 > load the skill and let your agent drive it. The Rust binaries below are
 > optional accelerators, not a prerequisite.
+
+## How the skill is built
+
+`SKILL.md` surfaces are **generated**, not hand-written, so they can't drift
+across harnesses. The source of truth is:
+
+- `SKILL.core.md` — the workflow body, with `{{PLACEHOLDER}}` markers.
+- `harnesses/<h>.overlay` — frontmatter + per-harness text (invocation,
+  how reviewers/executors map to that harness's tools).
+
+`tools/gen.sh` (pure bash, no Python) renders `SKILL.md`,
+`skills/hermes/SKILL.md`, and `skills/claude-code/SKILL.md`, each with a
+self-contained `references/` copy. CI runs `gen.sh` and fails if a committed
+surface ever diverges from the source (`gen-check` job). To rebuild locally:
+
+```bash
+bash tools/gen.sh
+```
 
 ## How it works
 

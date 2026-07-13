@@ -78,7 +78,7 @@ jobs:
             target/release/review-aggregator*
 
   gen-check:
-    name: Skill generator drift check
+    name: Skill generator drift + functional check
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -96,3 +96,25 @@ jobs:
             exit 1
           fi
           echo "Skill surfaces are in sync with source."
+
+      - name: Functional checks (generator + installer)
+        run: |
+          set -euo pipefail
+          echo "== no unfilled placeholders =="
+          grep -rn '{{' SKILL.md skills/hermes/SKILL.md skills/claude-code/SKILL.md && {
+            echo "::error::Found unfilled {{placeholder}} in rendered skill"; exit 1; }
+          echo "== frontmatter present =="
+          head -1 SKILL.md | grep -q '^---$' || { echo "::error::SKILL.md missing frontmatter"; exit 1; }
+          echo "== references copied =="
+          test -f skills/hermes/references/skill-walkthrough.md || { echo "::error::hermes references missing"; exit 1; }
+          test -f skills/claude-code/references/skill-walkthrough.md || { echo "::error::claude-code references missing"; exit 1; }
+          echo "== install.sh --list works =="
+          ./install.sh --list | grep -q 'hermes' || { echo "::error::install.sh --list broken"; exit 1; }
+          echo "== install.sh --check on missing install exits 1 =="
+          ./install.sh --harness hermes --check; rc=$?
+          test "$rc" -eq 1 || { echo "::error::--check should exit 1 for missing install, got $rc"; exit 1; }
+          echo "== install.sh rejects unknown harness =="
+          if ./install.sh --harness nope --check; then
+            echo "::error::unknown harness should fail"; exit 1
+          fi
+          echo "All generator + installer checks passed."
