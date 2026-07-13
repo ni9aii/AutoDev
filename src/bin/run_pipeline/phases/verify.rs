@@ -6,7 +6,7 @@ impl Pipeline {
     pub(crate) fn run_verify_phase(&self) -> Result<()> {
         log::log("=== PHASE 4: VERIFY ===");
 
-        // Run local tests (fail-fast)
+        // Run local tests (non-fatal: a missing runner is only a warning)
         self.run_local_tests()?;
 
         // Check CI status
@@ -64,8 +64,14 @@ impl Pipeline {
                 }
             }
             Err(e) => {
-                log::warn(&format!("No test runner found: {}", e));
-                anyhow::bail!("No test runner found in project: {}", e)
+                // No test runner available (e.g. `make` absent on Windows CI
+                // runners) — this is non-fatal: the verify phase should not
+                // fail solely because a local test runner isn't installed.
+                log::warn(&format!(
+                    "Skipping local test runner (not available): {}",
+                    e
+                ));
+                Ok(())
             }
         }
     }
