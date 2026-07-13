@@ -1,6 +1,9 @@
-# AutoDev Pipeline — Project Documentation
+# AutoDev Pipeline — Agent Skill
 
-This document describes the AutoDev project structure and its components.
+This is the skill definition for AutoDev: a self-contained workflow your agent
+runs for the review → plan → execute → verify → release cycle. Install it into
+your harness (see README → "Install the skill into your harness"), then invoke
+it and let your agent drive the pipeline with its own native tools.
 
 ## Source of Truth
 
@@ -15,14 +18,18 @@ follow what's documented here:
 
 Load the Hermes skill with: `/skill autodev`
 
-## What Is This
+## What This Skill Does
 
-AutoDev is an automated development pipeline toolchain written in Rust.
-It provides three binaries that accelerate the review-fix-release cycle:
+AutoDev is a workflow your agent runs to accelerate the review-fix-release
+cycle. In the default Hermes mode it uses only your agent's native tools —
+no external binaries required:
 
 - **run-pipeline** — orchestrates the full pipeline (review → aggregate → execute → verify → release)
 - **review-aggregator** — collects review findings, deduplicates, classifies as Do Now / Defer
 - **ci-check** — checks GitHub Actions CI status and runs local tests
+
+The three Rust binaries above are *optional accelerators* for the mechanical
+steps; the skill itself runs end to end with agent-native capabilities.
 
 ## Two Modes of Operation
 
