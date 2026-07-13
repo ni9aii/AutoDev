@@ -3,6 +3,25 @@ use anyhow::{Context, Result};
 use auto_dev_pipeline::log;
 use std::path::{Path, PathBuf};
 
+/// Resolve the `review-aggregator` companion binary.
+///
+/// The pipeline ships as a set of sibling binaries. Rather than assume the
+/// aggregator is on `$PATH` (true only after `cargo install`/manual install,
+/// but NOT in CI where `cargo test` leaves binaries in `target/debug/`), we
+/// first look next to the currently-running executable. Falls back to the bare
+/// name so a `$PATH` install still works.
+fn resolve_aggregator() -> String {
+    if let Ok(exe) = std::env::current_exe() {
+        if let Some(dir) = exe.parent() {
+            let candidate = dir.join("review-aggregator");
+            if candidate.is_file() {
+                return candidate.display().to_string();
+            }
+        }
+    }
+    "review-aggregator".to_string()
+}
+
 impl Pipeline {
     pub(crate) fn run_aggregate_phase(&self, review_dir: &Path) -> Result<PathBuf> {
         log::log("=== PHASE 2: AGGREGATE ===");
@@ -44,9 +63,10 @@ impl Pipeline {
 
         let arg_refs: Vec<&str> = args.iter().map(|s| s.as_str()).collect();
 
+        let aggregator = resolve_aggregator();
         let output = self
             .runner
-            .run("review-aggregator", &arg_refs, None)
+            .run(&aggregator, &arg_refs, None)
             .context("Failed to run review-aggregator")?;
 
         if !output.status.success() {
