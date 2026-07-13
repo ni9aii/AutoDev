@@ -25,7 +25,7 @@ pub mod log {
     }
 
     pub fn log(msg: &str) {
-        println!("{} {}", prefix("INFO"), msg);
+        eprintln!("{} {}", prefix("INFO"), msg);
     }
 
     pub fn warn(msg: &str) {
@@ -37,7 +37,7 @@ pub mod log {
     }
 
     pub fn success(msg: &str) {
-        println!("{} {}", prefix("OK"), msg);
+        eprintln!("{} {}", prefix("OK"), msg);
     }
 }
 
