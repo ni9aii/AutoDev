@@ -1,5 +1,37 @@
 # Changelog
 
+## [0.7.0] - 2026-07-14
+
+### Added
+- Single-command skill installer `install.sh` (auto-detects harness, or
+  `--harness`/`--list`/`--check`). It re-renders the skill and copies it into
+  the harness's skill directory.
+- Multi-harness skill generator `tools/gen.sh` (pure bash, no Python): renders
+  `SKILL.md` (generic), `skills/hermes/SKILL.md`, and `skills/claude-code/SKILL.md`
+  from one canonical `SKILL.core.md` + per-harness `harnesses/*.overlay` files.
+  Each output gets a self-contained `references/` copy.
+- `harnesses/{generic,hermes,claude-code}.overlay` — frontmatter + per-harness
+  invocation/reviewer/executor text.
+
+### Changed
+- Skill surfaces are now **generated**, not hand-written, so they can't drift
+  across harnesses. The repo keeps the source (`SKILL.core.md`, overlays,
+  `tools/gen.sh`) and the rendered outputs (committed, CI-verified).
+- README rewritten around `./install.sh`; added a "How the skill is built"
+  section explaining the generator.
+- Removed Python from the project (`tools/gen.py`) in favour of the bash
+  generator, keeping the Rust crate Python-free.
+
+### Fixed
+- `test_runner::run_local_tests` now returns `Result<Option<TestResult>>`:
+  `Ok(None)` when no test runner is configured *or* the configured runner
+  command is unavailable (e.g. `make` absent on Windows runners) — a non-fatal
+  skip instead of a hard failure. Both `verify` (run_pipeline) and `ci-check`
+  honor this, unblocking the Windows CI leg.
+- CI `gen-check` job now also runs functional checks (no unfilled
+  `{{placeholder}}`, frontmatter present, references copied, installer
+  `--list`/`--check` behavior).
+
 ## [0.6.0] - 2026-07-13
 
 ### Added
