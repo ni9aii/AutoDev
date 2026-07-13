@@ -153,6 +153,34 @@ pub mod process {
     }
 }
 
+pub mod bin_contract {
+    use std::path::PathBuf;
+
+    pub const AGGREGATOR: &str = "review-aggregator";
+    pub const CI_CHECK: &str = "ci-check";
+
+    /// Append the platform executable suffix (`` on Unix, `.exe` on Windows).
+    pub fn companion_exe_name(base: &str) -> String {
+        format!("{}{}", base, std::env::consts::EXE_SUFFIX)
+    }
+
+    /// Resolve a companion binary: prefer the file sitting next to the running
+    /// executable (works under `cargo test`/`target/` and `$PATH` installs),
+    /// fall back to the bare name so a `$PATH` install still works.
+    pub fn resolve_companion(base: &str) -> String {
+        let exe_name = companion_exe_name(base);
+        if let Ok(current) = std::env::current_exe() {
+            if let Some(dir) = current.parent() {
+                let candidate: PathBuf = dir.join(&exe_name);
+                if candidate.is_file() {
+                    return candidate.display().to_string();
+                }
+            }
+        }
+        exe_name
+    }
+}
+
 pub mod test_runner {
     use crate::process::ProcessRunner;
     use anyhow::{Context, Result};
@@ -641,5 +669,14 @@ mod tests {
             v,
             vec![Severity::Critical, Severity::Important, Severity::Minor]
         );
+    }
+
+    #[test]
+    fn test_resolve_companion_uses_exe_suffix() {
+        let name = crate::bin_contract::companion_exe_name("review-aggregator");
+        assert!(name.ends_with(std::env::consts::EXE_SUFFIX));
+        assert!(name.starts_with("review-aggregator"));
+        assert_eq!(crate::bin_contract::AGGREGATOR, "review-aggregator");
+        assert_eq!(crate::bin_contract::CI_CHECK, "ci-check");
     }
 }
