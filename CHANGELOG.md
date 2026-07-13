@@ -20,6 +20,14 @@
   the GitHub Release via `softprops/action-gh-release`.
 - No Dependabot/Renovate — added `.github/dependabot.yml` (cargo +
   github-actions ecosystems, weekly).
+- Default `dev-notes` root mismatch — `resolve_dev_notes_root()` in all three
+  binaries (`run_pipeline`, `review_aggregator`, `ci_check`) now falls back to
+  `~/obsidian-vault/dev-notes` instead of `~/dev-notes`, matching the
+  documented `$DEV_NOTES_ROOT` canonical default. Previously without
+  `DEV_NOTES_ROOT` set, binaries wrote reports to the wrong directory.
+- Hardcoded version strings — replaced literal `"1.1.0"` (and the
+  `"auto-dev-pipeline/1.0"` User-Agent) with `env!("CARGO_PKG_VERSION")` in
+  all three binaries, so `--version` and logs track `Cargo.toml` automatically.
 
 ### Changed
 - Docs reconciliation: `ni9aii/AutoDev` declared single source of truth for
@@ -30,8 +38,8 @@
   section to root `SKILL.md` and a pointer note in
   `skills/claude-code/SKILL.md`. The Hermes skill
   (`~/.hermes/skills/autonomous-ai-agents/autodev/SKILL.md`, separate repo)
-  updated to match and to reference this repo as canonical. No runtime
-  behavior changes — Rust binaries' fallback default is unchanged.
+  updated to match and to reference this repo as canonical. Runtime fallback
+  default is now `~/obsidian-vault/dev-notes` (see Fixed above).
 
 ## [0.3.0] - 2026-05-15
 
