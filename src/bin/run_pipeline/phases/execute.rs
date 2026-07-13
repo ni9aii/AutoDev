@@ -177,6 +177,9 @@ impl Pipeline {
                         .trim_matches('`')
                         .to_string();
                     fix.file = Some(file_str);
+                } else if trimmed.starts_with("**Action:**") {
+                    // Meta field written by the aggregator; not part of the
+                    // description that gets handed to the implementer. Skip.
                 } else if label == "description" {
                     // Skip the label itself, next lines go to description
                 } else if !trimmed.is_empty() {
@@ -291,6 +294,36 @@ mod tests {
         assert_eq!(fixes[0].severity, "UNKNOWN");
         assert_eq!(fixes[0].file, None);
         assert!(fixes[0].description.contains("Just a description line."));
+    }
+
+    #[test]
+    fn test_parse_fixes_action_meta_excluded_from_description() {
+        // Regression for Fix 5: the aggregator writes an **Action:** meta field
+        // into each Fix; it must NOT leak into the description handed to the
+        // implementer (Claude).
+        let pipeline = test_pipeline();
+        let input = "\
+### Fix 1: Wire up metrics\n\
+**Source:** code Reviewer\n\
+**Severity:** IMPORTANT\n\
+**File:** `src/main.rs`\n\
+**Description:**\n\
+Add a counter for requests.\n\
+**Action:** _To be filled by implementer_\n";
+        let fixes = pipeline.parse_fixes(input);
+        assert_eq!(fixes.len(), 1);
+        let desc = &fixes[0].description;
+        assert!(
+            !desc.to_lowercase().contains("to be filled by implementer"),
+            "Action meta leaked into description: {}",
+            desc
+        );
+        assert!(
+            !desc.to_lowercase().contains("action:"),
+            "Action label leaked into description: {}",
+            desc
+        );
+        assert!(desc.contains("Add a counter for requests."));
     }
 
     #[test]
