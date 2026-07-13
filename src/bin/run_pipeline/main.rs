@@ -6,6 +6,9 @@ use serde::Serialize;
 use std::path::PathBuf;
 
 mod phases;
+mod pipeline;
+
+use crate::pipeline::build::Pipeline;
 
 /// Available pipeline phases
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]
@@ -65,69 +68,7 @@ struct Args {
     json: bool,
 }
 
-struct Pipeline {
-    project_path: PathBuf,
-    phase: Phase,
-    version: Option<String>,
-    hermes_mode: bool,
-    project_name: Option<String>,
-    timestamp: String,
-    output_dir: PathBuf,
-    dev_notes_root: PathBuf,
-    json: bool,
-    runner: Box<dyn ProcessRunner>,
-}
-
 impl Pipeline {
-    fn new(args: Args) -> Result<Self> {
-        let timestamp = chrono::Local::now().format("%Y%m%d_%H%M%S").to_string();
-
-        // Validate project_path: must exist and not contain path traversal
-        let project_path = std::fs::canonicalize(&args.project_path)
-            .with_context(|| format!("Invalid project path: {}", args.project_path.display()))?;
-
-        let dev_notes_root =
-            auto_dev_pipeline::git::paths::resolve_dev_notes_root(args.dev_notes_root.as_ref())?;
-
-        let output_dir = if args.hermes_mode {
-            let project = args
-                .project
-                .clone()
-                .or_else(|| {
-                    project_path
-                        .file_name()
-                        .and_then(|n| n.to_str())
-                        .map(|s| s.to_string())
-                })
-                .unwrap_or_else(|| "unknown".to_string());
-            auto_dev_pipeline::validation::validate_project_name(&project)
-                .map_err(|e| anyhow::anyhow!(e))?;
-            dev_notes_root
-                .join(project)
-                .join("reviews")
-                .join(&timestamp)
-        } else {
-            dirs::home_dir()
-                .unwrap_or_else(|| PathBuf::from("."))
-                .join(".hermes/plans/auto-dev")
-        };
-
-        std::fs::create_dir_all(&output_dir)?;
-
-        Ok(Self {
-            project_path,
-            phase: args.phase,
-            version: args.version,
-            hermes_mode: args.hermes_mode,
-            project_name: args.project,
-            timestamp,
-            output_dir,
-            dev_notes_root,
-            json: args.json,
-            runner: Box::new(SystemRunner),
-        })
-    }
-
     fn check_prerequisites(&self) -> Result<()> {
         log::log("Checking prerequisites...");
 
@@ -173,7 +114,9 @@ impl Pipeline {
                     e
                 ));
                 log::error("Install: npm install -g @anthropic-ai/claude-code");
-                log::error("Or use --hermes-mode for delegate_task-based execution (no Claude CLI needed).");
+                log::error(
+                "Or use --hermes-mode for delegate_task-based execution (no Claude CLI needed).",
+            );
                 anyhow::bail!("Claude Code CLI unavailable");
             }
             Ok(out) => {
@@ -209,87 +152,12 @@ impl Pipeline {
             }
         }
     }
-
-    fn run(&self) -> Result<()> {
-        log::log(&format!(
-            "Auto-Dev Pipeline v{} (Rust)",
-            env!("CARGO_PKG_VERSION")
-        ));
-        log::log(&format!("Project: {}", self.project_path.display()));
-        log::log(&format!("Phase: {}", self.phase));
-        log::log(&format!(
-            "Mode: {}",
-            if self.hermes_mode {
-                "Hermes (delegate_task)"
-            } else {
-                "Legacy (Claude CLI)"
-            }
-        ));
-        log::log(&format!("Output: {}", self.output_dir.display()));
-
-        self.check_prerequisites()?;
-
-        match self.phase {
-            Phase::Review => {
-                self.run_review_phase()?;
-            }
-            Phase::Plan => {
-                let review_dir = self.run_review_phase()?;
-                self.run_aggregate_phase(&review_dir)?;
-            }
-            Phase::Full => {
-                let review_dir = self.run_review_phase()?;
-                let plan_path = self.run_aggregate_phase(&review_dir)?;
-                self.run_execute_phase(&plan_path)?;
-                self.run_verify_phase()?;
-            }
-            Phase::Release => {
-                let version = self.version.as_ref().context(
-                    "Release phase requires --release-version argument (e.g., --release-version v0.5.0)",
-                )?;
-                self.run_verify_phase()?;
-                self.run_release_phase(version)?;
-            }
-        }
-
-        if self.json {
-            let summary = PipelineSummary {
-                status: "success",
-                version: env!("CARGO_PKG_VERSION"),
-                project: self.project_path.display().to_string(),
-                phase: self.phase.to_string(),
-                mode: if self.hermes_mode { "hermes" } else { "legacy" },
-                timestamp: &self.timestamp,
-                output_dir: self.output_dir.display().to_string(),
-            };
-            println!(
-                "{}",
-                serde_json::to_string_pretty(&summary).context("serialize JSON summary")?
-            );
-        } else {
-            log::success("Pipeline complete!");
-            log::log(&format!("Reports: {}", self.output_dir.display()));
-        }
-
-        Ok(())
-    }
 }
 
-/// Machine-readable result of a pipeline run (emitted with `--json`).
-#[derive(Debug, Serialize)]
-struct PipelineSummary<'a> {
-    status: &'a str,
-    version: &'a str,
-    project: String,
-    phase: String,
-    mode: &'a str,
-    timestamp: &'a str,
-    output_dir: String,
-}
 fn main() -> Result<()> {
     let args = Args::parse();
     let pipeline = Pipeline::new(args)?;
-    pipeline.run()?;
+    crate::pipeline::dispatch::run(&pipeline)?;
     Ok(())
 }
 
