@@ -60,8 +60,14 @@ pub mod process {
         for dir in std::env::split_paths(&path_var) {
             let candidate = dir.join(name);
             if candidate.is_file() {
-                return std::fs::canonicalize(&candidate)
-                    .with_context(|| format!("Failed to canonicalize {}", candidate.display()));
+                // Canonicalize the directory only, not the file itself: some
+                // toolchains (e.g. rustup) ship `cargo`/`rustc` as symlinks to
+                // a single multiplexer binary that dispatches on argv[0], so
+                // fully resolving the symlink would rename the program and
+                // break that dispatch.
+                let canonical_dir = std::fs::canonicalize(&dir)
+                    .with_context(|| format!("Failed to canonicalize {}", dir.display()))?;
+                return Ok(canonical_dir.join(name));
             }
         }
         anyhow::bail!("Executable '{}' not found on PATH", name);
