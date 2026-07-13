@@ -118,7 +118,7 @@ Runs local tests and queries GitHub Actions CI status, writing a report to
 ## Phase 5 — Release
 
 ```bash
-run-pipeline /path/to/project release --version vX.Y.Z
+run-pipeline /path/to/project release --release-version vX.Y.Z
 # — or manually —
 git tag -a vX.Y.Z -m "Phase N: description"
 git push origin vX.Y.Z

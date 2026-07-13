@@ -61,7 +61,7 @@ if green.
 
 ### 6. Release (optional)
 
-`run-pipeline <project> release --version vX.Y.Z` (or the manual `git tag` +
+`run-pipeline <project> release --release-version vX.Y.Z` (or the manual `git tag` +
 GitHub Release flow). Builds the binary, tags, and publishes the release.
 
 ### 7. Loop decision

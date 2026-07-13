@@ -218,15 +218,17 @@ pub mod test_runner {
         pub stderr: String,
     }
 
-    pub fn run_local_tests(
-        project_path: &Path,
-        runner: &dyn ProcessRunner,
-    ) -> Result<TestResult> {
-        let test_runner = detect_test_runner(project_path)
-            .context("No test runner detected (Makefile, package.json, pyproject.toml, setup.py)")?;
+    pub fn run_local_tests(project_path: &Path, runner: &dyn ProcessRunner) -> Result<TestResult> {
+        let test_runner = detect_test_runner(project_path).context(
+            "No test runner detected (Makefile, package.json, pyproject.toml, setup.py)",
+        )?;
 
         let output = runner
-            .run(test_runner.program(), test_runner.args(), Some(project_path))
+            .run(
+                test_runner.program(),
+                test_runner.args(),
+                Some(project_path),
+            )
             .with_context(|| format!("Failed to run '{}'", test_runner.name()))?;
 
         Ok(TestResult {
@@ -256,7 +258,10 @@ pub mod git {
                 .with_context(|| format!("Invalid project path: {}", path.display()))?;
 
             if !canonical.join(".git").exists() && !canonical.join("Cargo.toml").exists() {
-                anyhow::bail!("Not a project directory (missing .git or Cargo.toml): {}", canonical.display());
+                anyhow::bail!(
+                    "Not a project directory (missing .git or Cargo.toml): {}",
+                    canonical.display()
+                );
             }
 
             Ok(canonical)
@@ -293,10 +298,8 @@ pub mod git {
     fn validate_github_slug(slug: &str) -> Result<()> {
         // GitHub username/repo names: alphanumeric, hyphens, underscores, dots
         // Cannot start/end with hyphen, cannot be empty, max 39 chars for users
-        static SLUG_RE: Lazy<Regex> = Lazy::new(|| {
-            Regex::new(r"^[a-zA-Z0-9_.-]+$")
-                .expect("Invalid SLUG_RE pattern")
-        });
+        static SLUG_RE: Lazy<Regex> =
+            Lazy::new(|| Regex::new(r"^[a-zA-Z0-9_.-]+$").expect("Invalid SLUG_RE pattern"));
         if slug.is_empty() || slug.len() > 100 || !SLUG_RE.is_match(slug) {
             anyhow::bail!("Invalid GitHub slug: '{}'", slug);
         }
@@ -467,7 +470,9 @@ mod tests {
         let mock = MockRunner::new();
         mock.push_response(mock_output(true, "origin-output", ""));
 
-        let output = mock.run("git", &["remote", "get-url", "origin"], None).unwrap();
+        let output = mock
+            .run("git", &["remote", "get-url", "origin"], None)
+            .unwrap();
         assert!(output.status.success());
         assert_eq!(String::from_utf8_lossy(&output.stdout), "origin-output");
 

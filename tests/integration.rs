@@ -74,11 +74,18 @@ fn integration_review_aggregator_produces_plan() {
         .join(project)
         .join("plans")
         .join(format!("{}-plan.md", timestamp));
-    assert!(plan_path.exists(), "plan file not created at {:?}", plan_path);
+    assert!(
+        plan_path.exists(),
+        "plan file not created at {:?}",
+        plan_path
+    );
 
     let plan = fs::read_to_string(&plan_path).unwrap();
     assert!(plan.contains("Do Now"), "plan missing 'Do Now' section");
-    assert!(plan.contains("SQL injection"), "plan missing aggregated finding");
+    assert!(
+        plan.contains("SQL injection"),
+        "plan missing aggregated finding"
+    );
     assert!(plan.contains("CRITICAL"), "plan missing severity label");
     // The aggregator must strip parser-metadata lines (File:/Description:) from
     // the description body, so the generated plan must not duplicate them.
@@ -87,7 +94,10 @@ fn integration_review_aggregator_produces_plan() {
     let file_count = plan.matches("**File:**").count();
     let desc_count = plan.matches("**Description:**").count();
     assert_eq!(file_count, 2, "File: metadata count wrong (leak/dup?)");
-    assert_eq!(desc_count, 2, "Description: metadata count wrong (leak/dup?)");
+    assert_eq!(
+        desc_count, 2,
+        "Description: metadata count wrong (leak/dup?)"
+    );
     assert!(
         !plan.contains("This is a duplicate metadata line"),
         "duplicate metadata line leaked into plan"
@@ -113,7 +123,10 @@ fn integration_review_aggregator_no_reviews_is_ok() {
         .status()
         .expect("spawn review-aggregator");
 
-    assert!(status.success(), "review-aggregator should handle empty input");
+    assert!(
+        status.success(),
+        "review-aggregator should handle empty input"
+    );
 }
 
 /// Run `run-pipeline` with `--json` and assert stdout is valid JSON with the
@@ -137,8 +150,8 @@ fn integration_run_pipeline_json_is_valid() {
     assert!(status.status.success(), "run-pipeline exited non-zero");
 
     let stdout = String::from_utf8_lossy(&status.stdout);
-    let value: serde_json::Value = serde_json::from_str(stdout.trim())
-        .expect("stdout is not valid JSON");
+    let value: serde_json::Value =
+        serde_json::from_str(stdout.trim()).expect("stdout is not valid JSON");
     assert_eq!(value["status"], "success");
     assert_eq!(value["phase"], "review");
     assert_eq!(value["mode"], "hermes");

@@ -48,8 +48,8 @@ struct Args {
     #[arg(short = 'V', long = "release-version")]
     version: Option<String>,
 
-    /// Hermes mode: use delegate_task instead of Claude CLI
-    #[arg(long, default_value = "false")]
+    /// Hermes mode: use delegate_task instead of Claude CLI (default)
+    #[arg(long, default_value = "true")]
     hermes_mode: bool,
 
     /// Project name for dev-notes path construction
@@ -101,10 +101,15 @@ impl Pipeline {
         let dev_notes_root = resolve_dev_notes_root(args.dev_notes_root.as_ref())?;
 
         let output_dir = if args.hermes_mode {
-            let project = args.project.clone()
-                .or_else(|| project_path.file_name()
-                    .and_then(|n| n.to_str())
-                    .map(|s| s.to_string()))
+            let project = args
+                .project
+                .clone()
+                .or_else(|| {
+                    project_path
+                        .file_name()
+                        .and_then(|n| n.to_str())
+                        .map(|s| s.to_string())
+                })
                 .unwrap_or_else(|| "unknown".to_string());
             dev_notes_root
                 .join(project)
@@ -172,7 +177,10 @@ impl Pipeline {
 
         match output {
             Err(e) => {
-                log::error(&format!("Claude Code CLI not found or could not run: {}", e));
+                log::error(&format!(
+                    "Claude Code CLI not found or could not run: {}",
+                    e
+                ));
                 log::error("Install: npm install -g @anthropic-ai/claude-code");
                 log::error("Or use --hermes-mode for delegate_task-based execution (no Claude CLI needed).");
                 anyhow::bail!("Claude Code CLI unavailable");
@@ -200,11 +208,7 @@ impl Pipeline {
                 if !out.status.success() {
                     let stderr = String::from_utf8_lossy(&out.stderr).trim().to_string();
                     let stdout = String::from_utf8_lossy(&out.stdout).trim().to_string();
-                    let detail = if !stderr.is_empty() {
-                        stderr
-                    } else {
-                        stdout
-                    };
+                    let detail = if !stderr.is_empty() { stderr } else { stdout };
                     log::error(&format!("Claude Code CLI exited with error: {}", detail));
                     anyhow::bail!("Claude Code CLI reported an error (see above)");
                 }
@@ -216,10 +220,20 @@ impl Pipeline {
     }
 
     fn run(&self) -> Result<()> {
-        log::log(&format!("Auto-Dev Pipeline v{} (Rust)", env!("CARGO_PKG_VERSION")));
+        log::log(&format!(
+            "Auto-Dev Pipeline v{} (Rust)",
+            env!("CARGO_PKG_VERSION")
+        ));
         log::log(&format!("Project: {}", self.project_path.display()));
         log::log(&format!("Phase: {}", self.phase));
-        log::log(&format!("Mode: {}", if self.hermes_mode { "Hermes (delegate_task)" } else { "Legacy (Claude CLI)" }));
+        log::log(&format!(
+            "Mode: {}",
+            if self.hermes_mode {
+                "Hermes (delegate_task)"
+            } else {
+                "Legacy (Claude CLI)"
+            }
+        ));
         log::log(&format!("Output: {}", self.output_dir.display()));
 
         self.check_prerequisites()?;
@@ -239,8 +253,9 @@ impl Pipeline {
                 self.run_verify_phase()?;
             }
             Phase::Release => {
-                let version = self.version.as_ref()
-                    .context("Release phase requires --version argument (e.g., --version v0.2.0)")?;
+                let version = self.version.as_ref().context(
+                    "Release phase requires --release-version argument (e.g., --release-version v0.5.0)",
+                )?;
                 self.run_verify_phase()?;
                 self.run_release_phase(version)?;
             }
@@ -252,11 +267,7 @@ impl Pipeline {
                 version: env!("CARGO_PKG_VERSION"),
                 project: self.project_path.display().to_string(),
                 phase: self.phase.to_string(),
-                mode: if self.hermes_mode {
-                    "hermes"
-                } else {
-                    "legacy"
-                },
+                mode: if self.hermes_mode { "hermes" } else { "legacy" },
                 timestamp: &self.timestamp,
                 output_dir: self.output_dir.display().to_string(),
             };
@@ -342,9 +353,11 @@ mod tests {
     #[test]
     fn test_check_claude_auth_fails_on_expired_oauth() {
         let mock = MockRunner::new();
-        mock.push_response(
-            mock_output(false, "", "Failed to authenticate: OAuth session expired"),
-        );
+        mock.push_response(mock_output(
+            false,
+            "",
+            "Failed to authenticate: OAuth session expired",
+        ));
         let pipeline = Pipeline {
             project_path: StdPathBuf::from("."),
             phase: Phase::Full,
