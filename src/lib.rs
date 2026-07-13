@@ -104,11 +104,21 @@ pub mod process {
     }
 
     /// Build a canned `std::process::Output` for use with `MockRunner`.
-    #[cfg(unix)]
+    /// Build a fake `Output` with the given success flag and captured streams.
+    /// Cross-platform: uses the OS-specific `ExitStatusExt::from_raw` so the
+    /// same helper compiles and behaves identically on Unix and Windows.
     pub fn mock_output(success: bool, stdout: &str, stderr: &str) -> Output {
-        use std::os::unix::process::ExitStatusExt;
+        let code = if success { 0 } else { 1 };
+        #[cfg(unix)]
+        let status = std::os::unix::process::ExitStatusExt::from_raw(code);
+        #[cfg(windows)]
+        let status = std::os::windows::process::ExitStatusExt::from_raw(code);
+        #[cfg(not(any(unix, windows)))]
+        let status = std::process::Command::new(if success { "true" } else { "false" })
+            .status()
+            .unwrap();
         Output {
-            status: ExitStatus::from_raw(if success { 0 } else { 1 }),
+            status,
             stdout: stdout.as_bytes().to_vec(),
             stderr: stderr.as_bytes().to_vec(),
         }
@@ -747,5 +757,15 @@ mod tests {
         assert_eq!(args[1], "/tmp/r");
         assert!(args.contains(&"--dev-notes".to_string()));
         assert!(args.contains(&"--project".to_string()));
+    }
+
+    #[test]
+    fn test_mock_output_cross_platform_helper() {
+        let o = crate::process::mock_output(true, "x", "");
+        assert!(o.status.success());
+        assert_eq!(String::from_utf8_lossy(&o.stdout), "x");
+        let e = crate::process::mock_output(false, "", "boom");
+        assert!(!e.status.success());
+        assert_eq!(String::from_utf8_lossy(&e.stderr), "boom");
     }
 }
