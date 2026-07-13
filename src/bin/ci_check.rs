@@ -227,7 +227,9 @@ impl CiChecker {
             });
 
             if let Some(project) = project_name {
-                let root = resolve_dev_notes_root(args.dev_notes_root.as_ref())?;
+                let root = auto_dev_pipeline::git::paths::resolve_dev_notes_root(
+                    args.dev_notes_root.as_ref(),
+                )?;
                 if let Err(e) = self.save_dev_notes_report(&project, ci_passed, local_passed, &root)
                 {
                     log::warn(&format!("Failed to save dev-notes report: {}", e));
@@ -306,18 +308,6 @@ impl CiChecker {
         log::log(&format!("CI report saved: {}", report_path.display()));
         Ok(())
     }
-}
-
-/// Resolve dev-notes root: --dev-notes-root > $DEV_NOTES_ROOT > ~/obsidian-vault/dev-notes
-fn resolve_dev_notes_root(override_path: Option<&PathBuf>) -> Result<PathBuf> {
-    if let Some(p) = override_path {
-        return Ok(p.clone());
-    }
-    if let Ok(env_root) = std::env::var("DEV_NOTES_ROOT") {
-        return Ok(PathBuf::from(env_root));
-    }
-    let home = dirs::home_dir().context("Could not determine home directory")?;
-    Ok(home.join("obsidian-vault").join("dev-notes"))
 }
 
 fn main() -> Result<()> {
