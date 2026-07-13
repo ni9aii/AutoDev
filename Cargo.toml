@@ -1,6 +1,6 @@
 [package]
 name = "auto-dev-pipeline"
-version = "0.5.0"
+version = "0.6.0"
 edition = "2021"
 description = "Auto-Dev Pipeline: review → plan → execute → CI → repeat"
 license = "MIT"

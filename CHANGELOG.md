@@ -1,5 +1,27 @@
 # Changelog
 
+## [0.6.0] - 2026-07-13
+
+### Added
+- `auto_dev_pipeline::bin_contract` module: central `resolve_companion()`
+  (replaces the duplicated `resolve_aggregator`/`resolve_ci_check` fns) that
+  is Windows-aware via `std::env::consts::EXE_SUFFIX`, plus typed
+  `AggregateRequest` / `CiCheckRequest` structs that render the exact CLI arg
+  vectors the `review-aggregator` / `ci-check` companions already parse.
+- Windows CI leg (`windows-latest` matrix) exercising the cross-platform
+  resolver and test helpers.
+
+### Changed
+- `run_pipeline` God-object split: `Pipeline` struct + `new()` moved to
+  `pipeline/build.rs`, phase dispatch (`run()`) moved to `pipeline/dispatch.rs`;
+  `main.rs` is now a thin CLI entry point (~250 LOC, down from ~385).
+- `process::mock_output` is now cross-platform (no `#[cfg(unix)]`), using the
+  OS-specific `ExitStatusExt::from_raw` on both Unix and Windows.
+
+### Fixed
+- Path-traversal guard `validate_project_name` now covered against Windows
+  backslash separators (`..\escape`, `foo\bar`).
+
 ## [0.5.0] - 2026-07-13
 
 ### Added
