@@ -220,7 +220,11 @@ fn parse_review_file(filepath: &Path) -> Result<Vec<Finding>> {
 }
 
 fn classify_finding(severity: &str, file: &Option<String>, body: &str) -> String {
-    let is_critical = severity == "CRITICAL" || severity == "IMPORTANT";
+    use auto_dev_pipeline::severity::Severity;
+    let is_critical = matches!(
+        severity.parse::<Severity>(),
+        Ok(Severity::Critical) | Ok(Severity::Important)
+    );
     let has_file = file.is_some();
     let is_simple = !body.contains("refactor")
         && !body.contains("architecture")
@@ -254,15 +258,12 @@ fn dedup_findings(findings: Vec<Finding>) -> Vec<Finding> {
 }
 
 fn prioritize_findings(findings: &[Finding]) -> Vec<Finding> {
-    let severity_order = |s: &str| match s {
-        "CRITICAL" => 0,
-        "IMPORTANT" => 1,
-        "MINOR" => 2,
-        _ => 3,
-    };
+    use auto_dev_pipeline::severity::Severity;
+    // Rank by typed severity (Critical=0, Important=1, Minor=2); unknown sorts last.
+    let severity_rank = |s: &str| s.parse::<Severity>().map(|sv| sv as u8).unwrap_or(u8::MAX);
 
     let mut sorted = findings.to_vec();
-    sorted.sort_by_key(|f| (severity_order(&f.severity), f.role.clone(), f.title.clone()));
+    sorted.sort_by_key(|f| (severity_rank(&f.severity), f.role.clone(), f.title.clone()));
     sorted
 }
 
@@ -597,5 +598,17 @@ Some detail.\n",
         );
         assert_eq!(findings[0].title, "Real architecture finding");
         let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn test_prioritize_orders_by_typed_severity() {
+        let findings = vec![
+            finding("code", "MINOR", "m", None),
+            finding("code", "CRITICAL", "c", None),
+            finding("code", "IMPORTANT", "i", None),
+        ];
+        let out = prioritize_findings(&findings);
+        let sevs: Vec<_> = out.iter().map(|f| f.severity.clone()).collect();
+        assert_eq!(sevs, vec!["CRITICAL", "IMPORTANT", "MINOR"]);
     }
 }
