@@ -303,6 +303,7 @@ pub mod test_runner {
         }
     }
 
+    #[derive(Debug, Clone)]
     pub struct TestResult {
         pub runner: TestRunner,
         pub success: bool,
@@ -793,5 +794,52 @@ mod tests {
         let e = crate::process::mock_output(false, "", "boom");
         assert!(!e.status.success());
         assert_eq!(String::from_utf8_lossy(&e.stderr), "boom");
+    }
+
+    #[test]
+    fn test_run_local_tests_no_runner_is_none() {
+        let td = std::env::temp_dir().join(format!("autodev-norunner-{}", std::process::id()));
+        let _ = std::fs::create_dir_all(&td);
+        let runner = crate::process::MockRunner::new();
+        // Empty dir: no Makefile/Cargo.toml/package.json/pyproject.toml/setup.py.
+        let res = crate::test_runner::run_local_tests(&td, &runner);
+        assert!(
+            matches!(res, Ok(None)),
+            "expected Ok(None) when no runner, got {:?}",
+            res
+        );
+        let _ = std::fs::remove_dir_all(&td);
+    }
+
+    #[test]
+    fn test_run_local_tests_unavailable_command_is_none() {
+        let td = std::env::temp_dir().join(format!("autodev-makefail-{}", std::process::id()));
+        let _ = std::fs::create_dir_all(&td);
+        std::fs::write(td.join("Makefile"), "test:\n\t@echo ok\n").unwrap();
+        let runner = crate::process::MockRunner::new();
+        // Makefile present -> Make detected, but the command can't launch -> None (skip).
+        runner.push_error("make: command not found");
+        let res = crate::test_runner::run_local_tests(&td, &runner);
+        assert!(
+            matches!(res, Ok(None)),
+            "unavailable runner must be Ok(None), got {:?}",
+            res
+        );
+        let _ = std::fs::remove_dir_all(&td);
+    }
+
+    #[test]
+    fn test_run_local_tests_success_is_some() {
+        let td = std::env::temp_dir().join(format!("autodev-makeok-{}", std::process::id()));
+        let _ = std::fs::create_dir_all(&td);
+        std::fs::write(td.join("Makefile"), "test:\n\t@echo ok\n").unwrap();
+        let runner = crate::process::MockRunner::new();
+        runner.push_response(crate::process::mock_output(true, "ok", ""));
+        let res = crate::test_runner::run_local_tests(&td, &runner);
+        match res {
+            Ok(Some(r)) => assert!(r.success, "expected success"),
+            other => panic!("expected Ok(Some), got {:?}", other),
+        }
+        let _ = std::fs::remove_dir_all(&td);
     }
 }
