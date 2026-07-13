@@ -105,7 +105,8 @@ impl Pipeline {
                 .context(format!("Failed to run {} reviewer", name))?;
 
             if !output.status.success() {
-                log::warn(&format!("{} reviewer exited with non-zero status", name));
+                log::error(&format!("{} reviewer exited with non-zero status", name));
+                anyhow::bail!("{} reviewer failed", name);
             }
 
             let stdout = String::from_utf8_lossy(&output.stdout);
