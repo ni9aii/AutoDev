@@ -52,7 +52,7 @@ jobs:
           cargo test --release --verbose
 
       - name: Attach release binaries
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           files: |
             target/release/run-pipeline
