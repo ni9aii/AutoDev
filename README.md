@@ -2,6 +2,8 @@
 
 [![CI](https://github.com/ni9aii/AutoDev/actions/workflows/ci.yml/badge.svg)](https://github.com/ni9aii/AutoDev/actions/workflows/ci.yml)
 
+![AutoDev logo](logo.png)
+
 Automated development pipeline: review → plan → execute → verify → release.
 
 ## Architecture (MVP)
