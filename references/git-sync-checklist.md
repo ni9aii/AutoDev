@@ -40,7 +40,6 @@ git pull --rebase origin main
 
 - CI commits on GitHub (workflow files, version bumps)
 - Parallel agent work on same files
-- graphify hook auto-commits (if enabled)
 - `.gitignore` changes between local and remote
 
 ## Prevention

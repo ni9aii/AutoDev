@@ -28,9 +28,29 @@
   - `CONTRIBUTING.md` updated to cover skill/docs contributions, not just Rust.
 
 ### Fixed
+- Audit fixes (docs ↔ code mismatches and stale data):
+  - `ci-check` now also reads `GITHUB_TOKEN` (previously only `GITHUB_PAT`),
+    matching the documented auth variables.
+  - `run-pipeline` now defaults to **Hermes mode** (`--hermes-mode` default
+    true), matching the docs that call Hermes the default.
+  - `release.rs` User-Agent now uses `CARGO_PKG_VERSION` instead of a frozen
+    `"auto-dev-pipeline/1.0"`.
+  - Release error message now references `--release-version` (the real flag),
+    not the invalid `--version`.
+  - Removed the undocumented `AUTO_DEV_VERSION` env var from README/SKILL/
+    `.env.example` (the code never read it; release version comes from
+    `--release-version`).
+  - Fixed all docs that used `--version` for release (real flag:
+    `--release-version`).
+  - Removed stale `graphify` references from `.gitignore` and
+    `references/git-sync-checklist.md` (the tool is not used).
+  - Corrected project-structure diagrams (`src/bin/run_pipeline/main.rs` +
+    `phases/`, not a single `run_pipeline.rs`).
+  - Removed a duplicate `## References` section in README.
+  - Added `DEV_NOTES_ROOT` to `.env.example`.
+  - Fixed an outdated `~/dev-notes` comment in `review_aggregator.rs`.
+
 - `review-aggregator` no longer fails fatally when no review directories exist;
-  it prints a warning and writes an empty plan (machine-readable, non-zero exit
-  avoided) so callers can handle an empty pipeline gracefully.
 - `review-aggregator` strips parser-metadata lines (`File:`, `Description:`,
   `Line:`, `Source:`) from finding bodies, so the generated plan no longer
   duplicates them inside the description section.

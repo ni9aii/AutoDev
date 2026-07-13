@@ -51,7 +51,8 @@ impl Pipeline {
                     log::success("Local tests passed");
                     Ok(())
                 } else {
-                    let stderr_preview = auto_dev_pipeline::markdown::safe_truncate(&result.stderr, 200);
+                    let stderr_preview =
+                        auto_dev_pipeline::markdown::safe_truncate(&result.stderr, 200);
                     anyhow::bail!(
                         "Local tests failed ({}):\nstdout: {}\nstderr: {}...",
                         result.runner.name(),

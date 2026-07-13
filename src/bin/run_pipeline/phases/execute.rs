@@ -25,8 +25,8 @@ impl Pipeline {
     fn run_execute_phase_hermes(&self, plan_path: &PathBuf) -> Result<()> {
         log::log("=== PHASE 3: EXECUTE (Hermes Mode) ===");
 
-        let plan_content = std::fs::read_to_string(plan_path)
-            .context("Failed to read plan file")?;
+        let plan_content =
+            std::fs::read_to_string(plan_path).context("Failed to read plan file")?;
 
         let do_now_section = markdown::extract_section(&plan_content, "Do Now");
         if do_now_section.is_empty() {
@@ -34,7 +34,10 @@ impl Pipeline {
             return Ok(());
         }
 
-        log::log(&format!("Found Do Now section ({} chars)", do_now_section.len()));
+        log::log(&format!(
+            "Found Do Now section ({} chars)",
+            do_now_section.len()
+        ));
 
         let fixes = self.parse_fixes(&do_now_section);
         log::log(&format!("Parsed {} fixes to execute", fixes.len()));
@@ -81,9 +84,8 @@ impl Pipeline {
 
     /// Legacy mode: execute fixes via Claude Code CLI
     fn run_execute_phase_legacy(&self, plan_path: &PathBuf) -> Result<()> {
-
-        let plan_content = std::fs::read_to_string(plan_path)
-            .context("Failed to read plan file")?;
+        let plan_content =
+            std::fs::read_to_string(plan_path).context("Failed to read plan file")?;
 
         // Extract Do Now fixes from plan
         let do_now_section = markdown::extract_section(&plan_content, "Do Now");
@@ -92,14 +94,22 @@ impl Pipeline {
             return Ok(());
         }
 
-        log::log(&format!("Found Do Now section ({} chars)", do_now_section.len()));
+        log::log(&format!(
+            "Found Do Now section ({} chars)",
+            do_now_section.len()
+        ));
 
         // Parse individual fixes from Do Now section
         let fixes = self.parse_fixes(&do_now_section);
         log::log(&format!("Parsed {} fixes to execute", fixes.len()));
 
         for (i, fix) in fixes.iter().enumerate() {
-            log::log(&format!("Executing fix {}/{}: {}", i + 1, fixes.len(), fix.title));
+            log::log(&format!(
+                "Executing fix {}/{}: {}",
+                i + 1,
+                fixes.len(),
+                fix.title
+            ));
 
             let project_path_str = self.project_path.display().to_string();
             let project_path_quoted = try_quote(&project_path_str)?;
@@ -115,11 +125,7 @@ impl Pipeline {
                 File: {}\n\
                 Description: {}\n\n\
                 Apply the fix directly to the source files. Use Read and Edit tools.",
-                project_path_quoted,
-                title_quoted,
-                severity_quoted,
-                file_quoted,
-                description_quoted
+                project_path_quoted, title_quoted, severity_quoted, file_quoted, description_quoted
             );
 
             self.execute_via_claude(&task)?;

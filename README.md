@@ -116,19 +116,7 @@ $DEV_NOTES_ROOT/
 | Variable | Description |
 |----------|-------------|
 | `GITHUB_TOKEN` / `GITHUB_PAT` | GitHub API auth (CI checks, releases) |
-| `AUTO_DEV_VERSION` | Fallback version for the release phase |
 | `DEV_NOTES_ROOT` | Root for dev-notes paths (default: `~/obsidian-vault/dev-notes`) |
-
-## References
-
-The `references/` folder holds deeper integration notes (not required to use
-the skill, but useful when adapting it):
-
-| File | Purpose |
-|------|---------|
-| `references/git-sync-checklist.md` | Pre/post-work git sync steps |
-| `references/hermes-delegate-task-integration.md` | `delegate_task` subagent integration guide |
-| `references/iteration-2-patterns.md` | Partial-fix traps, regressions, edge cases |
 
 ## Project structure
 
@@ -137,7 +125,9 @@ the skill, but useful when adapting it):
 ├── src/
 │   ├── lib.rs                  # Shared modules (log, git, markdown, test_runner)
 │   └── bin/
-│       ├── run_pipeline.rs     # Optional pipeline entry point
+│       ├── run_pipeline/       # Optional pipeline entry point
+│       │   ├── main.rs
+│       │   └── phases/{review,aggregate,execute,release,verify}.rs
 │       ├── ci_check.rs         # Optional CI status checker
 │       └── review_aggregator.rs # Optional aggregation + plan generation
 ├── skills/

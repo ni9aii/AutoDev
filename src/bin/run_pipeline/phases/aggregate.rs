@@ -8,10 +8,15 @@ impl Pipeline {
         log::log("=== PHASE 2: AGGREGATE ===");
 
         let plan_path = if self.hermes_mode {
-            let project_name = self.project_name.clone()
-                .or_else(|| self.project_path.file_name()
-                    .and_then(|n| n.to_str())
-                    .map(|s| s.to_string()))
+            let project_name = self
+                .project_name
+                .clone()
+                .or_else(|| {
+                    self.project_path
+                        .file_name()
+                        .and_then(|n| n.to_str())
+                        .map(|s| s.to_string())
+                })
                 .unwrap_or_else(|| "unknown".to_string());
             let plans_dir = self.dev_notes_root.join(&project_name).join("plans");
             std::fs::create_dir_all(&plans_dir)?;
@@ -58,7 +63,10 @@ impl Pipeline {
         let stdout = String::from_utf8_lossy(&output.stdout);
         eprint!("{}", stdout);
 
-        log::success(&format!("Aggregation complete. Plan: {}", plan_path.display()));
+        log::success(&format!(
+            "Aggregation complete. Plan: {}",
+            plan_path.display()
+        ));
         Ok(plan_path)
     }
 }

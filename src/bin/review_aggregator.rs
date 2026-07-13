@@ -24,13 +24,11 @@ static BULLET_RE: Lazy<Regex> = Lazy::new(|| {
         .expect("Invalid BULLET_RE pattern")
 });
 
-static FILE_RE: Lazy<Regex> = Lazy::new(|| {
-    Regex::new(r"(?i)[Ff]ile:\s*`?([^`\n]+)`?").expect("Invalid FILE_RE pattern")
-});
+static FILE_RE: Lazy<Regex> =
+    Lazy::new(|| Regex::new(r"(?i)[Ff]ile:\s*`?([^`\n]+)`?").expect("Invalid FILE_RE pattern"));
 
-static LINE_RE: Lazy<Regex> = Lazy::new(|| {
-    Regex::new(r"(?i)[Ll]ine:\s*(\d+)").expect("Invalid LINE_RE pattern")
-});
+static LINE_RE: Lazy<Regex> =
+    Lazy::new(|| Regex::new(r"(?i)[Ll]ine:\s*(\d+)").expect("Invalid LINE_RE pattern"));
 
 /// Matches "Description:" / "File:" / "Line:" lead-in lines that are parser
 /// metadata, not part of the actual finding description.
@@ -159,9 +157,7 @@ fn parse_review_file(filepath: &Path) -> Result<Vec<Finding>> {
         }
 
         // Extract file path
-        let file = FILE_RE
-            .captures(&body)
-            .map(|cap| cap[1].trim().to_string());
+        let file = FILE_RE.captures(&body).map(|cap| cap[1].trim().to_string());
 
         // Extract line number
         let line = LINE_RE
@@ -187,11 +183,11 @@ fn parse_review_file(filepath: &Path) -> Result<Vec<Finding>> {
 fn classify_finding(severity: &str, file: &Option<String>, body: &str) -> String {
     let is_critical = severity == "CRITICAL" || severity == "IMPORTANT";
     let has_file = file.is_some();
-    let is_simple = !body.contains("refactor") 
+    let is_simple = !body.contains("refactor")
         && !body.contains("architecture")
         && !body.contains("cross-module")
         && !body.contains("redesign");
-    
+
     if is_critical && has_file && is_simple {
         "do_now".to_string()
     } else {
@@ -205,12 +201,7 @@ fn dedup_key(finding: &Finding) -> String {
         "{}|{}|{}",
         finding.severity.trim().to_lowercase(),
         finding.title.trim().to_lowercase(),
-        finding
-            .file
-            .as_deref()
-            .unwrap_or("")
-            .trim()
-            .to_lowercase()
+        finding.file.as_deref().unwrap_or("").trim().to_lowercase()
     )
 }
 
@@ -247,7 +238,10 @@ fn generate_plan(findings: &[Finding], output_path: &Path) -> Result<()> {
     lines.push(format!("> Total findings: {}", findings.len()));
 
     let critical_count = findings.iter().filter(|f| f.severity == "CRITICAL").count();
-    let important_count = findings.iter().filter(|f| f.severity == "IMPORTANT").count();
+    let important_count = findings
+        .iter()
+        .filter(|f| f.severity == "IMPORTANT")
+        .count();
     let minor_count = findings.iter().filter(|f| f.severity == "MINOR").count();
 
     lines.push(format!("> Critical: {}", critical_count));
@@ -282,7 +276,10 @@ fn generate_plan(findings: &[Finding], output_path: &Path) -> Result<()> {
     lines.push(String::new());
 
     // Do Now section
-    let do_now: Vec<_> = prioritized.iter().filter(|f| f.classification == "do_now").collect();
+    let do_now: Vec<_> = prioritized
+        .iter()
+        .filter(|f| f.classification == "do_now")
+        .collect();
     if !do_now.is_empty() {
         lines.push("## 🔴 Do Now (Quick Wins)".to_string());
         lines.push(String::new());
@@ -305,7 +302,10 @@ fn generate_plan(findings: &[Finding], output_path: &Path) -> Result<()> {
     }
 
     // Defer section
-    let defer: Vec<_> = prioritized.iter().filter(|f| f.classification == "defer").collect();
+    let defer: Vec<_> = prioritized
+        .iter()
+        .filter(|f| f.classification == "defer")
+        .collect();
     if !defer.is_empty() {
         lines.push("## 🟡 Defer to Next Phase".to_string());
         lines.push(String::new());
@@ -327,7 +327,7 @@ fn generate_plan(findings: &[Finding], output_path: &Path) -> Result<()> {
     Ok(())
 }
 
-/// Resolve dev-notes root: --dev-notes-root > $DEV_NOTES_ROOT > ~/dev-notes
+/// Resolve dev-notes root: --dev-notes-root > $DEV_NOTES_ROOT > ~/obsidian-vault/dev-notes
 fn resolve_dev_notes_root(override_path: Option<&PathBuf>) -> Result<PathBuf> {
     if let Some(p) = override_path {
         return Ok(p.clone());
@@ -344,9 +344,10 @@ fn main() -> Result<()> {
 
     // Resolve dev-notes paths if --dev-notes flag is set
     let (input_dir, output_path) = if args.dev_notes {
-        let project = args.project.as_ref().context(
-            "--project is required when --dev-notes is enabled"
-        )?;
+        let project = args
+            .project
+            .as_ref()
+            .context("--project is required when --dev-notes is enabled")?;
         let root = resolve_dev_notes_root(args.dev_notes_root.as_ref())?;
         let reviews_dir = root.join(project).join("reviews");
 
@@ -476,7 +477,12 @@ mod tests {
     fn test_dedup_keeps_distinct_findings() {
         let findings = vec![
             finding("code", "CRITICAL", "SQL injection", Some("src/db.rs")),
-            finding("security", "IMPORTANT", "Missing auth check", Some("src/auth.rs")),
+            finding(
+                "security",
+                "IMPORTANT",
+                "Missing auth check",
+                Some("src/auth.rs"),
+            ),
         ];
         let deduped = dedup_findings(findings);
         assert_eq!(deduped.len(), 2);
