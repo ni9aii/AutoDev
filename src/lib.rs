@@ -348,7 +348,7 @@ pub mod markdown {
 
         for line in &lines {
             if let Some(heading) = heading_text(line) {
-                if heading.trim().to_lowercase() == target {
+                if heading_matches(heading, &target) {
                     in_section = true;
                     result.push(line.to_string());
                     continue;
@@ -363,6 +363,22 @@ pub mod markdown {
         }
 
         result.join("\n")
+    }
+
+    /// Does a Markdown heading identify the requested section?
+    ///
+    /// Matching is tolerant of leading decoration (emoji/symbols the aggregator
+    /// prepends, e.g. `🔴 Do Now (Quick Wins)`) and of a trailing parenthetical
+    /// or descriptive suffix, while still being strict on word boundaries so
+    /// `"Do"` does NOT match `"Don't Do This"`. Rule: strip leading
+    /// non-alphanumeric characters, lowercase, then accept an exact match or a
+    /// `target + " "` prefix (word-boundary safe).
+    fn heading_matches(heading: &str, target: &str) -> bool {
+        let normalized = heading
+            .trim_start_matches(|c: char| !c.is_alphanumeric())
+            .trim()
+            .to_lowercase();
+        normalized == *target || normalized.starts_with(&format!("{} ", target))
     }
 
     /// Truncate string safely at char boundary to avoid UTF-8 panic.
@@ -412,6 +428,23 @@ mod tests {
         let section = markdown::extract_section(content, "Do");
         assert!(!section.contains("Fix 1"));
         assert!(section.contains("Fix 2"));
+    }
+
+    #[test]
+    fn test_extract_section_matches_aggregator_decorated_heading() {
+        // Regression: review-aggregator emits "## 🔴 Do Now (Quick Wins)".
+        // The execute phase calls extract_section(plan, "Do Now"); a strict
+        // whole-heading equality check silently missed this, so execute found
+        // zero fixes on real aggregator output.
+        let content =
+            "# Auto-Dev Fix Plan\n\n## 🔴 Do Now (Quick Wins)\n- Fix A\n- Fix B\n\n## 🟡 Defer\n- Fix C";
+        let section = markdown::extract_section(content, "Do Now");
+        assert!(
+            section.contains("Fix A"),
+            "decorated 'Do Now' heading not matched"
+        );
+        assert!(section.contains("Fix B"));
+        assert!(!section.contains("Fix C"), "section bled into Defer");
     }
 
     #[test]
