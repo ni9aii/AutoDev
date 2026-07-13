@@ -112,11 +112,13 @@ jobs:
           echo "== install.sh --list works =="
           ./install.sh --list > /tmp/il.txt 2>&1
           grep -q hermes /tmp/il.txt || { echo "::error::install.sh --list broken"; exit 1; }
-          echo "== install.sh --check on missing install exits 1 =="
-          # claude-code is never pre-installed on the CI runner, so --check must
-          # report missing (exit 1). (hermes may already be present locally, so
-          # we don't assert its code here.)
-          ./install.sh --harness claude-code --check > /tmp/ic.txt 2>&1 && rc=0 || rc=$?
+          echo "== install into temp root, --check must report present (0) =="
+          rm -rf /tmp/adtest
+          AUTODEV_INSTALL_ROOT=/tmp/adtest ./install.sh --harness claude-code > /tmp/inst.txt 2>&1
+          AUTODEV_INSTALL_ROOT=/tmp/adtest ./install.sh --harness claude-code --check > /tmp/ic.txt 2>&1 && rc=0 || rc=$?
+          test "$rc" -eq 0 || { echo "::error::--check should exit 0 after install, got $rc"; exit 1; }
+          echo "== --check on different (empty) root must report missing (1) =="
+          AUTODEV_INSTALL_ROOT=/tmp/adtest2 ./install.sh --harness claude-code --check > /tmp/ic2.txt 2>&1 && rc=0 || rc=$?
           test "$rc" -eq 1 || { echo "::error::--check should exit 1 for missing install, got $rc"; exit 1; }
           echo "== install.sh rejects unknown harness =="
           if ./install.sh --harness nope --check > /tmp/in.txt 2>&1; then
