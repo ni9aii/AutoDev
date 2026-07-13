@@ -179,6 +179,60 @@ pub mod bin_contract {
         }
         exe_name
     }
+
+    /// Typed request for the `review-aggregator` companion. Renders the exact
+    /// CLI arg vector the aggregator already parses (`--input-dir`, `--output`,
+    /// optional `--project`, `--dev-notes --dev-notes-root`).
+    #[derive(Clone, Debug)]
+    pub struct AggregateRequest {
+        pub input_dir: PathBuf,
+        pub output: PathBuf,
+        pub project: Option<String>,
+        pub dev_notes_root: Option<PathBuf>,
+    }
+
+    impl AggregateRequest {
+        pub fn to_args(&self) -> Vec<String> {
+            let mut a = vec![
+                "--input-dir".to_string(),
+                self.input_dir.display().to_string(),
+                "--output".to_string(),
+                self.output.display().to_string(),
+            ];
+            if let Some(p) = &self.project {
+                a.push("--project".to_string());
+                a.push(p.clone());
+            }
+            if let Some(root) = &self.dev_notes_root {
+                a.push("--dev-notes".to_string());
+                a.push("--dev-notes-root".to_string());
+                a.push(root.display().to_string());
+            }
+            a
+        }
+    }
+
+    /// Typed request for the `ci-check` companion.
+    #[derive(Clone, Debug)]
+    pub struct CiCheckRequest {
+        pub project_path: PathBuf,
+        pub project: Option<String>,
+        pub dev_notes: bool,
+    }
+
+    impl CiCheckRequest {
+        pub fn to_args(&self) -> Vec<String> {
+            let mut a = vec![self.project_path.display().to_string()];
+            if let Some(p) = &self.project {
+                a.push("--project".to_string());
+                a.push(p.clone());
+            }
+            if self.dev_notes {
+                a.push("--dev-notes".to_string());
+            }
+            a
+        }
+    }
 }
 
 pub mod test_runner {
@@ -678,5 +732,20 @@ mod tests {
         assert!(name.starts_with("review-aggregator"));
         assert_eq!(crate::bin_contract::AGGREGATOR, "review-aggregator");
         assert_eq!(crate::bin_contract::CI_CHECK, "ci-check");
+    }
+
+    #[test]
+    fn test_aggregate_request_args_roundtrip() {
+        let req = crate::bin_contract::AggregateRequest {
+            input_dir: "/tmp/r".into(),
+            output: "/tmp/p.md".into(),
+            project: Some("proj".into()),
+            dev_notes_root: Some("/dn".into()),
+        };
+        let args = req.to_args();
+        assert_eq!(args[0], "--input-dir");
+        assert_eq!(args[1], "/tmp/r");
+        assert!(args.contains(&"--dev-notes".to_string()));
+        assert!(args.contains(&"--project".to_string()));
     }
 }
