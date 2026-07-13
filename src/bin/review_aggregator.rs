@@ -128,25 +128,45 @@ fn parse_review_file(filepath: &Path) -> Result<Vec<Finding>> {
     let mut matches: Vec<(String, String, String)> = Vec::new();
     let lines: Vec<&str> = content.lines().collect();
     let mut i = 0;
+    let mut in_code = false;
     while i < lines.len() {
         let line = lines[i];
-        if let Some(cap) = HEADER_RE.captures(line) {
-            let severity = cap[1].to_uppercase();
-            let title = cap[2].trim().to_string();
-            // Collect body until next header or end
-            let mut body_lines = Vec::new();
-            i += 1;
-            while i < lines.len() {
-                let next = lines[i];
-                if next.starts_with("### ") || next.starts_with("## ") || next.starts_with("# ") {
-                    break;
-                }
-                body_lines.push(next);
+        // Toggle fenced code-block state on ``` lines (with optional language).
+        if line.trim_start().starts_with("```") {
+            in_code = !in_code;
+        }
+        // Headers inside code blocks are prose, not findings.
+        if !in_code {
+            if let Some(cap) = HEADER_RE.captures(line) {
+                let severity = cap[1].to_uppercase();
+                let title = cap[2].trim().to_string();
+                // Collect body until next real heading, respecting code fences.
+                let mut body_lines = Vec::new();
                 i += 1;
+                let mut body_in_code = false;
+                while i < lines.len() {
+                    let next = lines[i];
+                    if next.trim_start().starts_with("```") {
+                        body_in_code = !body_in_code;
+                        body_lines.push(next);
+                        i += 1;
+                        continue;
+                    }
+                    // A markdown heading only ends the body outside code blocks.
+                    if !body_in_code
+                        && (next.starts_with("### ")
+                            || next.starts_with("## ")
+                            || next.starts_with("# "))
+                    {
+                        break;
+                    }
+                    body_lines.push(next);
+                    i += 1;
+                }
+                let body = body_lines.join("\n").trim().to_string();
+                matches.push((severity, title, body));
+                continue;
             }
-            let body = body_lines.join("\n").trim().to_string();
-            matches.push((severity, title, body));
-            continue;
         }
         i += 1;
     }
@@ -154,6 +174,11 @@ fn parse_review_file(filepath: &Path) -> Result<Vec<Finding>> {
     for cap in TABLE_RE.captures_iter(&content) {
         let severity = cap[1].to_uppercase();
         let title = cap[2].trim().to_string();
+        // Skip summary-count rows like `| CRITICAL | 1 |` where the "title"
+        // cell is just a number — these are severity tallies, not findings.
+        if title.chars().all(|c| c.is_ascii_digit()) {
+            continue;
+        }
         matches.push((severity, title, String::new()));
     }
 
@@ -503,5 +528,74 @@ mod tests {
         ];
         let deduped = dedup_findings(findings);
         assert_eq!(deduped.len(), 1);
+    }
+
+    #[test]
+    fn test_parse_review_ignores_headers_inside_code_blocks() {
+        // Regression for Fix 14: a `### [SEVERITY]` heading (or any `#` line)
+        // inside a fenced code block is prose, not a finding. Otherwise review
+        // reports that show example findings in ``` blocks spawn phantom
+        // findings, and `#`-lines inside code falsely truncate a finding body.
+        let dir = std::env::temp_dir().join(format!("autodev-parse-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let p = dir.join("code-review.md");
+        std::fs::write(
+            &p,
+            "## 🔴 Do Now (Quick Wins)\n\n\
+### [IMPORTANT] Real finding\n\
+Body line one\n\
+```\n\
+### [CRITICAL] Phantom inside code\n\
+## not a heading\n\
+```\n\
+trailing body after code block\n",
+        )
+        .unwrap();
+
+        let findings = parse_review_file(&p).unwrap();
+        // Only the one real finding; the header inside ``` must be ignored.
+        assert_eq!(findings.len(), 1, "code-block header leaked as finding");
+        assert_eq!(findings[0].title, "Real finding");
+        // The `#`-line inside the fence must NOT have truncated the body.
+        assert!(
+            findings[0]
+                .description
+                .contains("trailing body after code block"),
+            "body truncated at in-code '#': {}",
+            findings[0].description
+        );
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn test_parse_review_ignores_summary_count_table() {
+        // Regression: a severity-tally table in the report header
+        //   | CRITICAL | 1 |
+        //   | IMPORTANT | 7 |
+        // must NOT be parsed as findings (title cell is a bare number).
+        let dir = std::env::temp_dir().join(format!("autodev-tbl-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let p = dir.join("architecture-review.md");
+        std::fs::write(
+            &p,
+            "## Summary\n\
+| Severity | Count |\n\
+| CRITICAL | 1 |\n\
+| IMPORTANT | 7 |\n\
+| MINOR | 6 |\n\n\
+### [CRITICAL] Real architecture finding\n\
+Some detail.\n",
+        )
+        .unwrap();
+
+        let findings = parse_review_file(&p).unwrap();
+        assert_eq!(
+            findings.len(),
+            1,
+            "summary tally rows leaked as findings: {:?}",
+            findings.iter().map(|f| f.title.clone()).collect::<Vec<_>>()
+        );
+        assert_eq!(findings[0].title, "Real architecture finding");
+        let _ = std::fs::remove_dir_all(&dir);
     }
 }
