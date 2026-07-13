@@ -215,5 +215,129 @@ fn integration_run_pipeline_plan_end_to_end() {
     plans.sort_by_key(|e| e.file_name());
     assert!(!plans.is_empty(), "no plan file written");
     let plan = fs::read_to_string(plans[0].path()).unwrap();
-    assert!(plan.contains("Auto-Dev Fix Plan"), "plan content unexpected");
+    assert!(
+        plan.contains("Auto-Dev Fix Plan"),
+        "plan content unexpected"
+    );
+}
+
+/// End-to-end: `run-pipeline <git-repo> full` must drive all four phases
+/// (review → aggregate → execute → verify) to completion. This is the test
+/// that exercises BOTH companion binaries — `review-aggregator` (aggregate) and
+/// `ci-check` (verify) — via the sibling-resolution path, so it guards against
+/// the "works locally, fails when companions aren't on $PATH" regression.
+///
+/// Hermetic: the temp repo has no `origin` remote, so `ci-check` can't reach
+/// the GitHub API and falls back to local tests only. A tiny `Makefile` with a
+/// no-op `test` target satisfies the verify phase's local-test requirement
+/// without a network or a real toolchain invocation.
+#[test]
+fn integration_run_pipeline_full_end_to_end() {
+    let td = TempDir::new("run-full");
+    let project = "e2e-full";
+
+    let init = Command::new("git")
+        .args(["init", "-q"])
+        .current_dir(&td.path)
+        .status()
+        .expect("git init");
+    assert!(init.success(), "git init failed");
+
+    // A Makefile makes detect_test_runner pick `make test`; the target is a
+    // no-op so the verify phase's local-test check passes cheaply.
+    fs::write(td.path.join("Makefile"), "test:\n\t@echo ok\n").unwrap();
+    fs::create_dir_all(td.path.join(project).join("reviews")).unwrap();
+
+    let out = Command::new(env!("CARGO_BIN_EXE_run-pipeline"))
+        .args([
+            td.path.to_str().unwrap(),
+            "full",
+            "--hermes-mode",
+            "--dev-notes-root",
+            td.path.to_str().unwrap(),
+            "--project",
+            project,
+        ])
+        .output()
+        .expect("spawn run-pipeline");
+
+    assert!(
+        out.status.success(),
+        "run-pipeline full exited non-zero.\nstdout: {}\nstderr: {}",
+        String::from_utf8_lossy(&out.stdout),
+        String::from_utf8_lossy(&out.stderr)
+    );
+
+    // Aggregate phase must have written a plan (proves review-aggregator ran).
+    let plans_dir = td.path.join(project).join("plans");
+    assert!(
+        plans_dir.exists(),
+        "plans dir not created by aggregate phase"
+    );
+    assert!(
+        fs::read_dir(&plans_dir).unwrap().next().is_some(),
+        "no plan file written by aggregate phase"
+    );
+
+    // Verify phase must have reached completion (proves ci-check ran).
+    let combined = format!(
+        "{}{}",
+        String::from_utf8_lossy(&out.stdout),
+        String::from_utf8_lossy(&out.stderr)
+    );
+    assert!(
+        combined.contains("Verification complete"),
+        "verify phase did not complete (ci-check may not have run)"
+    );
+    assert!(
+        combined.contains("Pipeline complete"),
+        "pipeline did not reach completion"
+    );
+}
+
+/// `run-pipeline <repo> release` without `--release-version` must fail fast at
+/// argument validation — BEFORE building, tagging, or pushing anything. Guards
+/// the destructive release path: a misinvocation must never create a git tag or
+/// hit the network.
+#[test]
+fn integration_run_pipeline_release_requires_version() {
+    let td = TempDir::new("run-release-noversion");
+
+    let init = Command::new("git")
+        .args(["init", "-q"])
+        .current_dir(&td.path)
+        .status()
+        .expect("git init");
+    assert!(init.success(), "git init failed");
+
+    let out = Command::new(env!("CARGO_BIN_EXE_run-pipeline"))
+        .args([td.path.to_str().unwrap(), "release", "--hermes-mode"])
+        .output()
+        .expect("spawn run-pipeline");
+
+    assert!(
+        !out.status.success(),
+        "release without --release-version must fail, but exited 0"
+    );
+    let combined = format!(
+        "{}{}",
+        String::from_utf8_lossy(&out.stdout),
+        String::from_utf8_lossy(&out.stderr)
+    );
+    assert!(
+        combined.contains("release-version"),
+        "error message should point to the --release-version flag, got: {}",
+        combined
+    );
+
+    // Critical: no tag may have been created by a failed/misinvoked release.
+    let tags = Command::new("git")
+        .args(["tag"])
+        .current_dir(&td.path)
+        .output()
+        .expect("git tag");
+    assert!(
+        tags.stdout.is_empty(),
+        "release must not create a git tag when it fails validation"
+    );
 }

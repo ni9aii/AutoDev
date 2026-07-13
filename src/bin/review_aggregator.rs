@@ -39,18 +39,21 @@ static META_RE: Lazy<Regex> = Lazy::new(|| {
 
 /// Matches the `Description:` lead-in. The description is multi-line, so only
 /// the prefix is stripped and the following text is kept.
-static DESC_RE: Lazy<Regex> = Lazy::new(|| {
-    Regex::new(r"(?im)^\s*Description\s*:\s*").expect("Invalid DESC_RE pattern")
-});
+static DESC_RE: Lazy<Regex> =
+    Lazy::new(|| Regex::new(r"(?im)^\s*Description\s*:\s*").expect("Invalid DESC_RE pattern"));
 
 /// Strips parser-metadata from a finding body so the generated plan does not
 /// duplicate it. `File:`/`Line:`/`Source:` lines are dropped entirely (their
 /// value is already in structured fields); `Description:` keeps its text with
 /// only the prefix removed.
 fn clean_body(body: &str) -> String {
-    body
-        .lines()
-        .map(|l| DESC_RE.replace(META_RE.replace(l, "").as_ref(), "").trim().to_string())
+    body.lines()
+        .map(|l| {
+            DESC_RE
+                .replace(META_RE.replace(l, "").as_ref(), "")
+                .trim()
+                .to_string()
+        })
         .filter(|l| !l.is_empty())
         .collect::<Vec<_>>()
         .join("\n")
