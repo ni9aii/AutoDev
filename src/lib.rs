@@ -676,11 +676,11 @@ mod tests {
 
     #[test]
     fn test_resolve_exe_finds_known_binary() {
-        // A shell present on the running OS: `sh` on Unix, `cmd` on Windows.
+        // A shell present on the running OS: `sh` on Unix, `cmd.exe` on Windows.
         #[cfg(unix)]
         let name = "sh";
         #[cfg(windows)]
-        let name = "cmd";
+        let name = "cmd.exe";
         let resolved = process::resolve_exe(name).expect("known shell should be on PATH");
         assert!(resolved.is_absolute());
         assert!(resolved.is_file());
