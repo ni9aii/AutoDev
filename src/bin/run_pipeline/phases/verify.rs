@@ -47,7 +47,7 @@ impl Pipeline {
         log::log("Checking local test status...");
 
         match test_runner::run_local_tests(&self.project_path, self.runner.as_ref()) {
-            Ok(result) => {
+            Ok(Some(result)) => {
                 log::log(&format!("Running: {}", result.runner.name()));
                 if result.success {
                     log::success("Local tests passed");
@@ -63,14 +63,15 @@ impl Pipeline {
                     )
                 }
             }
-            Err(e) => {
+            Ok(None) => {
                 // No test runner available (e.g. `make` absent on Windows CI
-                // runners) — this is non-fatal: the verify phase should not
-                // fail solely because a local test runner isn't installed.
-                log::warn(&format!(
-                    "Skipping local test runner (not available): {}",
-                    e
-                ));
+                // runners) — non-fatal: the verify phase should not fail solely
+                // because a local test runner isn't installed.
+                log::warn("No local test runner available — skipping local test step");
+                Ok(())
+            }
+            Err(e) => {
+                log::warn(&format!("Local test runner error (skipped): {}", e));
                 Ok(())
             }
         }

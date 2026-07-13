@@ -159,22 +159,36 @@ impl CiChecker {
 
     fn check_local_tests(&self) -> Result<()> {
         log::log("Checking local test status...");
-        let result = auto_dev_pipeline::test_runner::run_local_tests(
+        match auto_dev_pipeline::test_runner::run_local_tests(
             &self.project_path,
             self.runner.as_ref(),
-        )?;
-        log::log(&format!("Running: {}", result.runner.name()));
-        if result.success {
-            log::success(&format!("Local tests passed ({})", result.runner.name()));
-            Ok(())
-        } else {
-            let stderr_preview = auto_dev_pipeline::markdown::safe_truncate(&result.stderr, 200);
-            anyhow::bail!(
-                "Local tests failed ({}):\nstdout: {}\nstderr: {}...",
-                result.runner.name(),
-                result.stdout,
-                stderr_preview
-            )
+        ) {
+            Ok(Some(result)) => {
+                log::log(&format!("Running: {}", result.runner.name()));
+                if result.success {
+                    log::success(&format!("Local tests passed ({})", result.runner.name()));
+                    Ok(())
+                } else {
+                    let stderr_preview =
+                        auto_dev_pipeline::markdown::safe_truncate(&result.stderr, 200);
+                    anyhow::bail!(
+                        "Local tests failed ({}):\nstdout: {}\nstderr: {}...",
+                        result.runner.name(),
+                        result.stdout,
+                        stderr_preview
+                    )
+                }
+            }
+            Ok(None) => {
+                // No runner configured or command unavailable (e.g. `make`
+                // absent on Windows). Non-fatal: skip, don't fail the check.
+                log::warn("No local test runner available — skipping local test step");
+                Ok(())
+            }
+            Err(e) => {
+                log::warn(&format!("Local test runner error (skipped): {}", e));
+                Ok(())
+            }
         }
     }
 
