@@ -2,6 +2,25 @@
 
 ## [Unreleased]
 
+### Fixed (Known Limitations from 0.3.0)
+- PATH hijack risk — all bare `Command::new("claude"/"cargo"/"git"/"gh"/...)`
+  call sites replaced with a `ProcessRunner` trait (`SystemRunner` in
+  production) backed by a hand-rolled `resolve_exe()` that resolves and
+  canonicalizes the executable from `$PATH` before spawning it.
+- `parse_fixes` fragile parser — `**Description:**` label matching is now
+  case/whitespace-tolerant, and fix titles with no colon use the full
+  remainder instead of silently falling back to `"Unknown"`.
+- Pipeline "God object" — `src/bin/run_pipeline.rs` (739 lines, 15 methods,
+  direct subprocess coupling) split into
+  `src/bin/run_pipeline/{main.rs,phases/{review,aggregate,execute,release,verify}.rs}`;
+  phases depend on `ProcessRunner`, not concrete `Command`, so they're
+  unit-testable via `MockRunner` without spawning real processes.
+- No release/deploy CI workflow — added `.github/workflows/release.yml`,
+  triggered on `v*` tag push, builds release binaries and attaches them to
+  the GitHub Release via `softprops/action-gh-release`.
+- No Dependabot/Renovate — added `.github/dependabot.yml` (cargo +
+  github-actions ecosystems, weekly).
+
 ### Changed
 - Docs reconciliation: `ni9aii/AutoDev` declared single source of truth for
   pipeline conventions (paths, invocation, config). Replaced hardcoded

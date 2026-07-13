@@ -1,4 +1,5 @@
 use anyhow::{Context, Result};
+use auto_dev_pipeline::process::{ProcessRunner, SystemRunner};
 use auto_dev_pipeline::{git, log};
 use clap::Parser;
 use std::fs;
@@ -28,11 +29,15 @@ struct Args {
 
 struct CiChecker {
     project_path: PathBuf,
+    runner: Box<dyn ProcessRunner>,
 }
 
 impl CiChecker {
     fn new(project_path: PathBuf) -> Self {
-        Self { project_path }
+        Self {
+            project_path,
+            runner: Box::new(SystemRunner),
+        }
     }
 
     fn check_ci_status(&self, repo: &str) -> Result<bool> {
@@ -133,7 +138,10 @@ impl CiChecker {
 
     fn check_local_tests(&self) -> Result<()> {
         log::log("Checking local test status...");
-        let result = auto_dev_pipeline::test_runner::run_local_tests(&self.project_path)?;
+        let result = auto_dev_pipeline::test_runner::run_local_tests(
+            &self.project_path,
+            self.runner.as_ref(),
+        )?;
         log::log(&format!("Running: {}", result.runner.name()));
         if result.success {
             log::success(&format!("Local tests passed ({})", result.runner.name()));
@@ -154,7 +162,7 @@ impl CiChecker {
         log::log(&format!("Project: {}", self.project_path.display()));
 
         // Get repo info
-        let repo = match git::get_repo_info(&self.project_path) {
+        let repo = match git::get_repo_info(&self.project_path, self.runner.as_ref()) {
             Ok(repo) => {
                 log::log(&format!("Repository: {}", repo));
                 Some(repo)
@@ -213,9 +221,9 @@ impl CiChecker {
 
     /// Try to get GitHub token from `gh auth token` CLI
     fn gh_auth_token(&self) -> Result<String> {
-        let output = std::process::Command::new("gh")
-            .args(["auth", "token"])
-            .output()
+        let output = self
+            .runner
+            .run("gh", &["auth", "token"], None)
             .context("Failed to run 'gh auth token'")?;
 
         if !output.status.success() {
@@ -257,7 +265,8 @@ impl CiChecker {
             {}\n",
             project,
             chrono::Local::now().format("%Y-%m-%d %H:%M:%S"),
-            git::get_repo_info(&self.project_path).unwrap_or_else(|_| "unknown".to_string()),
+            git::get_repo_info(&self.project_path, self.runner.as_ref())
+                .unwrap_or_else(|_| "unknown".to_string()),
             status_icon(ci_passed),
             status_icon(local_passed),
             if ci_passed && local_passed {
