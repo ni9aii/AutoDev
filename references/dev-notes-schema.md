@@ -94,8 +94,47 @@ body.
   `**Action:**`.
 - `## 🟡 Defer to Next Phase` — same shape for deferred findings.
 
-The plan's `## 🔴 Do Now (Quick Wins)` section is what the execute phase
-consumes.
+The plan's `## 🔴 Do Now (Quick Wins)` section is what the execute
+phase consumes.
+
+### From plan to implementation
+
+Simple fixes (≤2 files, ≤20 lines) can be applied directly from the
+`Do Now` section. For complex fixes, use the `plan` skill to decompose
+each `Do Now` item into bite-sized implementation tasks (see
+`references/plan-autodev-integration.md`). The conversion pattern is:
+
+1. Each `### Fix N: <title>` under `🔴 Do Now` becomes a high-level
+   plan entry.
+2. If the fix involves multiple files, API changes, or new
+   dependencies, write it out as a full implementation plan using the
+   `plan` skill format (header + bite-sized TDD tasks).
+3. If the fix is a single change in one file, execute it directly per
+   the autodev execute phase guidelines.
+
+Example conversion:
+
+**Aggregator output:**
+```markdown
+### Fix 1: SQL injection in db.rs query builder
+**Severity:** CRITICAL
+**File:** `src/db.rs`
+**Line:** 42
+```
+
+**Resulting plan-skill prompt:**
+"Write an implementation plan for: Fix SQL injection in db.rs query
+builder (CRITICAL). File `src/db.rs:42`. Replace string concatenation
+with parameterized queries. Use the plan skill format with bite-sized
+TDD tasks."
+
+### Plan file naming convention
+
+Aggregator-generated plans use the timestamp format from their source
+review directories: `<timestamp>-plan.md` (e.g.
+`20260714_080000-plan.md`). Manually authored implementation plans that
+extend an aggregator plan should use the same timestamp to preserve
+traceability back to the reviews that produced them.
 
 ## CI report format
 
