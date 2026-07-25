@@ -8,7 +8,7 @@ platforms: [linux, windows, macos]
 metadata:
   hermes:
     tags: [AutoDev, Pipeline, Review, Code-Quality, CI, Automation, Rust]
-    related_skills: [autonomous-ai-agents]
+    related_skills: [autonomous-ai-agents, plan]
     quick_commands:
       - name: autodev
         description: "Run full AutoDev pipeline on a project"
