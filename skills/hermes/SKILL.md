@@ -8,7 +8,7 @@ platforms: [linux, windows, macos]
 metadata:
   hermes:
     tags: [AutoDev, Pipeline, Review, Code-Quality, CI, Automation, Rust]
-    related_skills: [autonomous-ai-agents]
+    related_skills: [autonomous-ai-agents, plan]
     quick_commands:
       - name: autodev
         description: "Run full AutoDev pipeline on a project"
@@ -40,7 +40,7 @@ through the agent's own tools.
 This repository (`ni9aii/AutoDev`) is the canonical source for AutoDev pipeline
 conventions: paths, invocation, and configuration. Other skill surfaces must
 follow what's documented here. This file is **generated** from `SKILL.core.md`
-+ `harnesses/<h>.yaml` by `tools/gen.py`; edit those, not the rendered output.
++ `harnesses/<h>.overlay` by `tools/gen.sh`; edit those, not the rendered output.
 
 ## Invocation
 
@@ -125,7 +125,7 @@ Binaries install to `target/release/`. `cargo install --path .` puts
 ├── .github/workflows/
 │   ├── ci.yml                  # CI (ubuntu + windows matrix)
 │   └── release.yml             # Tag-triggered release with 3 binaries
-├── SKILL.core.md + harnesses/  # Skill source (rendered by tools/gen.py)
+├── SKILL.core.md + harnesses/  # Skill source (rendered by tools/gen.sh)
 ├── Cargo.toml / Cargo.lock
 ├── README.md / CHANGELOG.md / LICENSE (MIT)
 └── SKILL.md                    # Rendered (generic) skill — do not edit by hand
