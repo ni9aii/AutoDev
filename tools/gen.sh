@@ -49,15 +49,46 @@ render() {
   local core="$1" overlay="$2"
   local out
   out="$(cat "$core")"
-  for key in FRONTMATTER INVOKE REVIEWERS EXECUTE INSTALL_PATH_HINT; do
+
+  # Keys actually used by the core file (single source of truth — the loop
+  # below can no longer drift from what SKILL.core.md contains).
+  local core_keys
+  core_keys="$(printf '%s' "$out" | grep -o '{{[A-Z_]*}}' | tr -d '{}' | sort -u)"
+
+  # Keys provided by this overlay.
+  local overlay_keys
+  overlay_keys="$(grep -o '^@@[A-Z_]*@@$' "$overlay" | tr -d '@' | sort -u)"
+
+  # Strict contract: every core key must exist in the overlay and vice versa.
+  local missing extra k
+  missing="$(comm -23 <(printf '%s\n' "$core_keys") <(printf '%s\n' "$overlay_keys"))"
+  extra="$(comm -13 <(printf '%s\n' "$core_keys") <(printf '%s\n' "$overlay_keys"))"
+  if [ -n "$missing" ]; then
+    echo "ERROR: $overlay is missing overlay keys used by core: $(echo "$missing" | tr '\n' ' ')" >&2
+    exit 1
+  fi
+  if [ -n "$extra" ]; then
+    echo "ERROR: $overlay defines keys the core never uses: $(echo "$extra" | tr '\n' ' ')" >&2
+    exit 1
+  fi
+
+  while IFS= read -r k; do
+    [ -n "$k" ] || continue
     local val
-    val="$(extract "$overlay" "$key")"
+    val="$(extract "$overlay" "$k")"
     # strip a single leading/trailing blank line for cleanliness
     val="$(printf '%s' "$val" | sed -e '1{/^$/d}' -e '${/^$/d}')"
-    out="${out//\{\{$key\}\}/$val}"
-  done
-  # drop any unfilled placeholder (defensive)
-  out="$(printf '%s' "$out" | sed -E 's/\{\{[A-Z_]+\}\}//g')"
+    out="${out//\{\{$k\}\}/$val}"
+  done <<< "$core_keys"
+
+  # Strict contract: no placeholder may survive substitution. Fail loudly
+  # instead of stripping silently — a typo'd key or missing overlay section
+  # used to render as an empty section that passed every gate.
+  if printf '%s' "$out" | grep -q '{{[A-Z_]*}}'; then
+    echo "ERROR: unfilled placeholders remain after substitution:" >&2
+    printf '%s' "$out" | grep -o '{{[A-Z_]*}}' | sort -u >&2
+    exit 1
+  fi
   printf '%s\n' "$out"
 }
 
@@ -81,7 +112,7 @@ for entry in "${TARGETS[@]}"; do
   overlay_name="${entry%%:*}"
   rel_target="${entry#*:}"
   overlay="$HARNESS_DIR/$overlay_name"
-  [ -f "$overlay" ] || { echo "WARN: $overlay missing, skip" >&2; continue; }
+  [ -f "$overlay" ] || { echo "ERROR: $overlay missing (every target surface requires its overlay — silent skips used to leave stale SKILL.md files that still passed the drift check)" >&2; exit 1; }
   rendered="$(render "$CORE" "$overlay")"
   target="$ROOT/$rel_target"
   mkdir -p "$(dirname "$target")"
