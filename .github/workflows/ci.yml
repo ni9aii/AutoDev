@@ -112,6 +112,18 @@ jobs:
           echo "== references copied =="
           test -f skills/hermes/references/skill-walkthrough.md || { echo "::error::hermes references missing"; exit 1; }
           test -f skills/claude-code/references/skill-walkthrough.md || { echo "::error::claude-code references missing"; exit 1; }
+          echo "== artifact path contract consistent across surfaces =="
+          # The aggregator reads reviews/<YYYYMMDD_HHMMSS>/<role>-review.md.
+          # Every rendered surface must document exactly this layout — a
+          # divergent path string silently produces empty plans (Deferred-1).
+          PAT='reviews/<YYYYMMDD_HHMMSS>/<role>-review.md'
+          for f in SKILL.md skills/hermes/SKILL.md skills/claude-code/SKILL.md; do
+            grep -qF "$PAT" "$f" || { echo "::error::$f does not document the artifact path contract ($PAT)"; exit 1; }
+          done
+          if grep -rE 'reviews/<YYYY-MM-DD>|review-report\.md' SKILL.md skills/hermes/SKILL.md skills/claude-code/SKILL.md harnesses/ SKILL.core.md; then
+            echo "::error::stale artifact path format found (see above)"; exit 1
+          fi
+          echo "install.sh checks follow"
           echo "== install.sh --list works =="
           ./install.sh --list > /tmp/il.txt 2>&1
           grep -q hermes /tmp/il.txt || { echo "::error::install.sh --list broken"; exit 1; }

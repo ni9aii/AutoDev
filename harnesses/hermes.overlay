@@ -21,7 +21,7 @@ Run the four reviewers (code, security, architecture, devops) as **parallel
 `delegate_task` subagents** (one at a time if rate limits are tight). Each
 reads the sources and writes its report to:
 
-$DEV_NOTES_ROOT/<project>/reviews/<YYYY-MM-DD>-<role>-review-report.md
+$DEV_NOTES_ROOT/<project>/reviews/<YYYYMMDD_HHMMSS>/<role>-review.md
 
 Finding format per reviewer:
 

@@ -13,7 +13,7 @@ Run the four reviewers (code, security, architecture, devops) with your
 harness's subagent / parallel-execution mechanism. Each reads the sources and
 writes its report to:
 
-$DEV_NOTES_ROOT/<project>/reviews/<YYYY-MM-DD>-<role>-review-report.md
+$DEV_NOTES_ROOT/<project>/reviews/<YYYYMMDD_HHMMSS>/<role>-review.md
 
 Finding format per reviewer:
 
