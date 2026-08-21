@@ -253,11 +253,33 @@ impl CiChecker {
             }
         }
 
+        // Fail-closed decision (see overall_outcome doc): a known repo with
+        // failing/unverifiable CI is fatal, not just a warning in the report.
+        let repo_known = repo.is_some();
+        Self::overall_outcome(repo_known, ci_passed, local_passed)?;
+
+        log::success("All checks complete!");
+        Ok(())
+    }
+
+    /// Fail-closed exit decision (plan finding: "ci-check exits 0 even when
+    /// GitHub Actions runs are failing").
+    ///
+    /// - Local test failure is always fatal.
+    /// - A *known* repo whose CI is failing OR could not be verified (API
+    ///   error, rate limit, zero runs) is fatal: the tool's purpose is to gate
+    ///   on remote CI, so silence must not mean green.
+    /// - An unknown repo (not GitHub / no origin) cannot be checked remotely:
+    ///   warn-only, decided locally.
+    fn overall_outcome(repo_known: bool, ci_passed: bool, local_passed: bool) -> Result<()> {
         if !local_passed {
             anyhow::bail!("Local tests failed — see output above");
         }
-
-        log::success("All checks complete!");
+        if repo_known && !ci_passed {
+            anyhow::bail!(
+                "GitHub Actions CI is failing or could not be verified — see output above"
+            );
+        }
         Ok(())
     }
 
@@ -333,4 +355,40 @@ fn main() -> Result<()> {
     let checker = CiChecker::new(args.project_path.clone());
     checker.run(&args)?;
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // Matrix tests for the fail-closed exit decision. This is the gate that
+    // decides whether the verify/release phases proceed, so every combination
+    // is pinned explicitly.
+    #[test]
+    fn outcome_all_passed_is_ok() {
+        assert!(CiChecker::overall_outcome(true, true, true).is_ok());
+    }
+
+    #[test]
+    fn outcome_failing_ci_with_known_repo_fails_closed() {
+        // Regression: previously exited 0 when remote CI failed but local
+        // tests passed — releases could be tagged on a red repo.
+        let err = CiChecker::overall_outcome(true, false, true)
+            .expect_err("known repo + failing CI must fail");
+        assert!(err.to_string().contains("CI"));
+    }
+
+    #[test]
+    fn outcome_local_failure_always_fatal() {
+        assert!(CiChecker::overall_outcome(true, true, false).is_err());
+        assert!(CiChecker::overall_outcome(false, true, false).is_err());
+        assert!(CiChecker::overall_outcome(false, false, false).is_err());
+    }
+
+    #[test]
+    fn outcome_unknown_repo_cannot_fail_on_ci() {
+        // Non-GitHub / origin-less repos: remote CI unknowable → warn-only,
+        // decision falls to local results.
+        assert!(CiChecker::overall_outcome(false, false, true).is_ok());
+    }
 }
