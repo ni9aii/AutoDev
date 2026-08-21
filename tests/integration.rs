@@ -153,7 +153,6 @@ fn integration_run_pipeline_json_is_valid() {
         .args([
             ".",
             "review",
-            
             "--json",
             "--dev-notes-root",
             td.path.to_str().unwrap(),
@@ -194,7 +193,6 @@ fn integration_run_pipeline_plan_end_to_end() {
         .args([
             td.path.to_str().unwrap(),
             "plan",
-            
             "--dev-notes-root",
             td.path.to_str().unwrap(),
             "--project",
@@ -252,7 +250,6 @@ fn integration_run_pipeline_full_end_to_end() {
         .args([
             td.path.to_str().unwrap(),
             "full",
-            
             "--dev-notes-root",
             td.path.to_str().unwrap(),
             "--project",
