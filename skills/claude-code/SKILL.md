@@ -142,7 +142,7 @@ Launch the four reviewers (code, security, architecture, devops) as **4
 parallel sub-agents via the Workflow tool**. Each reads the sources and writes
 its report to:
 
-$DEV_NOTES_ROOT/<project>/reviews/<YYYY-MM-DD>-<role>-review-report.md
+$DEV_NOTES_ROOT/<project>/reviews/<YYYYMMDD_HHMMSS>/<role>-review.md
 
 Prompt each sub-agent:
 
@@ -213,22 +213,31 @@ user before pushing to main or creating a release.
 ## dev-notes Integration
 
 When using `--dev-notes` flag, reports are written under `$DEV_NOTES_ROOT`
-(default `~/obsidian-vault/dev-notes`, overridable via `--dev-notes-root`):
+(default `~/obsidian-vault/dev-notes`, overridable via `--dev-notes-root`).
+
+**Artifact path contract (single source of truth — reviewers MUST write to
+this exact layout; the aggregator reads it):**
 
 ```text
 $DEV_NOTES_ROOT/
 └── <project>/
     ├── reviews/
-    │   └── YYYYMMDD_HHMMSS/
-    │       ├── code-review.md
+    │   └── <YYYYMMDD_HHMMSS>/          ← one timestamped dir per run
+    │       ├── code-review.md          ← <role>-review.md, flat inside the dir
     │       ├── security-review.md
     │       ├── architecture-review.md
     │       └── devops-review.md
     ├── plans/
-    │   └── YYYYMMDD_HHMMSS-plan.md
+    │   └── YYYYMMDD_HHMMSS-plan.md     ← aggregator picks the LATEST reviews/<ts>/ dir
     └── ci-reports/
         └── YYYYMMDD_HHMMSS-ci-status.md
 ```
+
+Reviewer output files are named `<role>-review.md` (code, security,
+architecture, devops) and live directly inside the run's timestamped
+directory — never flat under `reviews/`, never with a date-suffixed filename.
+The `plan` phase aggregates exactly the latest `<YYYYMMDD_HHMMSS>/`
+subdirectory.
 
 ## References
 

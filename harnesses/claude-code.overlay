@@ -13,7 +13,7 @@ Launch the four reviewers (code, security, architecture, devops) as **4
 parallel sub-agents via the Workflow tool**. Each reads the sources and writes
 its report to:
 
-$DEV_NOTES_ROOT/<project>/reviews/<YYYY-MM-DD>-<role>-review-report.md
+$DEV_NOTES_ROOT/<project>/reviews/<YYYYMMDD_HHMMSS>/<role>-review.md
 
 Prompt each sub-agent:
 
