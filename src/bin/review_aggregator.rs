@@ -384,7 +384,14 @@ fn main() -> Result<()> {
             root.join(project).join("reviews")
         };
 
-        // Find the most recent timestamp directory
+        // Find the most recent timestamp directory. A missing reviews/ dir
+        // (fresh project) is not an error: create it and fall through to the
+        // empty-plan path below.
+        if !reviews_dir.exists() {
+            fs::create_dir_all(&reviews_dir).with_context(|| {
+                format!("Failed to create reviews dir: {}", reviews_dir.display())
+            })?;
+        }
         let latest_dir = fs::read_dir(&reviews_dir)
             .with_context(|| format!("Failed to read reviews dir: {}", reviews_dir.display()))?
             .filter_map(|e| e.ok())
@@ -401,6 +408,9 @@ fn main() -> Result<()> {
                     .to_string(),
             ),
             None => {
+                // Keep the empty-plan promise: no review directories under an
+                // existing reviews/ means a fresh project — emit the empty
+                // plan instead of erroring.
                 eprintln!(
                     "[auto-dev] WARNING: No review directories found in {} — generating empty plan",
                     reviews_dir.display()

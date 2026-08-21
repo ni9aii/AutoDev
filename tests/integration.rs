@@ -143,6 +143,39 @@ fn integration_review_aggregator_no_reviews_is_ok() {
     );
 }
 
+/// Regression (plan finding: empty-plan fallback promised "generating empty
+/// plan" then bailed when reviews/ itself didn't exist). A fresh project with
+/// NO reviews directory at all must still get an empty plan, not an error.
+#[test]
+fn integration_review_aggregator_missing_reviews_dir_gets_empty_plan() {
+    let td = TempDir::new("aggregator-no-dir");
+    let project = "fresh";
+    // Deliberately do NOT create <project>/reviews/.
+
+    let status = Command::new(env!("CARGO_BIN_EXE_review-aggregator"))
+        .args([
+            "--dev-notes",
+            "--dev-notes-root",
+            td.path.to_str().unwrap(),
+            "--project",
+            project,
+        ])
+        .status()
+        .expect("spawn review-aggregator");
+
+    assert!(
+        status.success(),
+        "missing reviews/ dir must produce an empty plan, not an error"
+    );
+
+    let plan = td.path.join(project).join("plans").join("empty-plan.md");
+    assert!(
+        plan.exists(),
+        "empty plan not written at {}",
+        plan.display()
+    );
+}
+
 /// Run `run-pipeline` with `--json` and assert stdout is valid JSON with the
 /// expected top-level fields (logs go to stderr, so stdout is JSON-only).
 #[test]
