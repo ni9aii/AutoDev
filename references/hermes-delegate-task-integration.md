@@ -12,7 +12,7 @@ mode** — it never calls an external binary and works with your agent alone.
 
 | Mode | Reviewers | Executor for fixes | Requires |
 |------|-----------|-------------------|----------|
-| **Hermes** (default, `--hermes-mode`) | `delegate_task` (4 parallel reviewers) | `read_file`+`patch` (simple) or `delegate_task` (complex) | Your agent only |
+| **Hermes** (default, ``) | `delegate_task` (4 parallel reviewers) | `read_file`+`patch` (simple) or `delegate_task` (complex) | Your agent only |
 | Legacy | `claude -p` CLI | `claude -p` CLI | Claude Code CLI, authenticated |
 
 Legacy mode is a fallback for agents that wrap Claude Code. It runs a pre-flight
@@ -21,46 +21,46 @@ is missing or its OAuth session has expired (see issue #1). Prefer Hermes mode.
 
 ## Phase 1 — Review (parallel `delegate_task`)
 
-In Hermes mode `run-pipeline review --hermes-mode` prints `delegate_task`
+In Hermes mode `run-pipeline review ` prints `delegate_task`
 instructions for four reviewers. Each reviewer is its own subagent call. Launch
 three first, then the fourth separately (Hermes `max_concurrent_children` is 3).
 
 ```python
 # Code Reviewer
 delegate_task(
-    goal="Code Reviewer: check logic, style, idioms, performance",
-    context=""""
-    PROJECT_PATH: /path/to/project
-    OUTPUT_PATH: $DEV_NOTES_ROOT/<project>/reviews/<timestamp>/code-review.md
+ goal="Code Reviewer: check logic, style, idioms, performance",
+ context=""""
+ PROJECT_PATH: /path/to/project
+ OUTPUT_PATH: $DEV_NOTES_ROOT/<project>/reviews/<timestamp>/code-review.md
 
-    Read the source files, analyze for bugs/style/edge cases/tests.
-    Save the report to OUTPUT_PATH (markdown).
-    """,
-    toolsets=['file', 'search_files', 'terminal']
+ Read the source files, analyze for bugs/style/edge cases/tests.
+ Save the report to OUTPUT_PATH (markdown).
+ """,
+ toolsets=['file', 'search_files', 'terminal']
 )
 
 # Security Reviewer (parallel)
 delegate_task(
-    goal="Security Reviewer: check vulnerabilities, unsafe code, secrets",
-    context="""PROJECT_PATH: /path/to/project
-    OUTPUT_PATH: $DEV_NOTES_ROOT/<project>/reviews/<timestamp>/security-review.md""",
-    toolsets=['file', 'search_files', 'terminal']
+ goal="Security Reviewer: check vulnerabilities, unsafe code, secrets",
+ context="""PROJECT_PATH: /path/to/project
+ OUTPUT_PATH: $DEV_NOTES_ROOT/<project>/reviews/<timestamp>/security-review.md""",
+ toolsets=['file', 'search_files', 'terminal']
 )
 
 # Architecture Reviewer (parallel)
 delegate_task(
-    goal="Architecture Reviewer: check structure, coupling, patterns",
-    context="""PROJECT_PATH: /path/to/project
-    OUTPUT_PATH: $DEV_NOTES_ROOT/<project>/reviews/<timestamp>/architecture-review.md""",
-    toolsets=['file', 'search_files', 'terminal']
+ goal="Architecture Reviewer: check structure, coupling, patterns",
+ context="""PROJECT_PATH: /path/to/project
+ OUTPUT_PATH: $DEV_NOTES_ROOT/<project>/reviews/<timestamp>/architecture-review.md""",
+ toolsets=['file', 'search_files', 'terminal']
 )
 
 # DevOps Reviewer (launch after the first three complete)
 delegate_task(
-    goal="DevOps Reviewer: check CI/CD, dependencies, build, deploy",
-    context="""PROJECT_PATH: /path/to/project
-    OUTPUT_PATH: $DEV_NOTES_ROOT/<project>/reviews/<timestamp>/devops-review.md""",
-    toolsets=['file', 'search_files', 'terminal']
+ goal="DevOps Reviewer: check CI/CD, dependencies, build, deploy",
+ context="""PROJECT_PATH: /path/to/project
+ OUTPUT_PATH: $DEV_NOTES_ROOT/<project>/reviews/<timestamp>/devops-review.md""",
+ toolsets=['file', 'search_files', 'terminal']
 )
 ```
 
@@ -78,9 +78,9 @@ review-aggregator --dev-notes --project <project> [--dev-notes-root <root>]
 
 - Auto-discovers the **latest** `reviews/<timestamp>/` directory
 - Parses every `### [CRITICAL|IMPORTANT|MINOR] Title` finding (also accepts
-  table-row and bullet-list formats)
+ table-row and bullet-list formats)
 - Strips parser-metadata lines (`File:`, `Description:`, `Line:`, `Source:`)
-  from finding bodies so they are not duplicated in the plan
+ from finding bodies so they are not duplicated in the plan
 - Deduplicates by severity + title + file
 - Classifies each finding as **Do Now** (simple, single-file) or **Defer**
 - Writes the plan to `plans/<timestamp>-plan.md`
@@ -140,10 +140,10 @@ Max iterations should be configurable in the harness (a reasonable default is 5)
 ## Notes for harness integrators
 
 - **No terminal required.** Load the skill (`/skill autodev` in Hermes) and let
-  the agent drive everything with native tools. The Rust binaries are
-  *accelerators* for the mechanical steps, not a prerequisite.
+ the agent drive everything with native tools. The Rust binaries are
+ *accelerators* for the mechanical steps, not a prerequisite.
 - **`--json` for programmatic use.** `run-pipeline --json` prints a
-  machine-readable summary on **stdout** and routes all human log output to
-  **stderr**. Parse the JSON when wrapping the binary from your own code.
+ machine-readable summary on **stdout** and routes all human log output to
+ **stderr**. Parse the JSON when wrapping the binary from your own code.
 - **dev-notes root.** Defaults to `~/obsidian-vault/dev-notes`; override with
-  `--dev-notes-root` or the `DEV_NOTES_ROOT` env var.
+ `--dev-notes-root` or the `DEV_NOTES_ROOT` env var.

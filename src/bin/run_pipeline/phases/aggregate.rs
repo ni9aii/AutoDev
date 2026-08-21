@@ -51,14 +51,17 @@ impl Pipeline {
             .context("Failed to run review-aggregator")?;
 
         if !output.status.success() {
-            log::warn(&format!(
-                "review-aggregator exited with code: {:?}",
-                output.status.code()
-            ));
+            // Fatal (plan finding: aggregate phase swallowed aggregator
+            // failure and returned a plan path anyway): a failed aggregation
+            // must stop Plan/Full here — otherwise execute later dies with a
+            // generic "Failed to read plan file" (or worse, proceeds on a
+            // stale plan) and the root cause is masked.
             let stderr = String::from_utf8_lossy(&output.stderr);
-            if !stderr.is_empty() {
-                log::warn(&stderr);
-            }
+            anyhow::bail!(
+                "review-aggregator exited with code {:?}: {}",
+                output.status.code(),
+                stderr.trim()
+            );
         }
 
         let stdout = String::from_utf8_lossy(&output.stdout);

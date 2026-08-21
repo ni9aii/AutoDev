@@ -30,7 +30,10 @@ jobs:
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
         with:
-          components: clippy
+          components: clippy, rustfmt
+
+      - name: Check formatting
+        run: cargo fmt --check
 
       - name: Cache cargo registry
         uses: actions/cache@v6
