@@ -52,8 +52,18 @@ impl CiChecker {
 
         log::log(&format!("Checking CI status for: {}", repo));
 
+        // Current branch, so the verdict only considers runs for what is
+        // checked out here (plan finding: the 3 most recent runs across ALL
+        // branches were deciding the verdict).
+        let current_branch = self.current_branch().ok();
+        if let Some(ref branch) = current_branch {
+            log::log(&format!("Filtering workflow runs by branch: {}", branch));
+        } else {
+            log::warn("Could not determine current branch — considering runs from all branches");
+        }
+
         let api_url = format!(
-            "https://api.github.com/repos/{}/actions/runs?per_page=5",
+            "https://api.github.com/repos/{}/actions/runs?per_page=15",
             repo
         );
 
@@ -111,8 +121,23 @@ impl CiChecker {
             .context("No workflow_runs in response")?;
 
         let mut all_passed = true;
+        let mut considered = 0usize;
 
-        for run in runs.iter().take(3) {
+        for run in runs {
+            let branch = run
+                .get("head_branch")
+                .and_then(|v| v.as_str())
+                .unwrap_or("unknown");
+
+            // Only the checked-out branch decides the verdict; unrelated
+            // feature-branch failures must not fail us (and vice versa mask
+            // our own red run).
+            if let Some(ref current) = current_branch {
+                if branch != current.as_str() {
+                    continue;
+                }
+            }
+
             let name = run
                 .get("name")
                 .and_then(|v| v.as_str())
@@ -125,19 +150,29 @@ impl CiChecker {
                 .get("conclusion")
                 .and_then(|v| v.as_str())
                 .unwrap_or("N/A");
-            let branch = run
-                .get("head_branch")
-                .and_then(|v| v.as_str())
-                .unwrap_or("unknown");
             let url = run.get("html_url").and_then(|v| v.as_str()).unwrap_or("");
 
-            let icon = match conclusion {
-                "success" => "✅",
-                "failure" => {
+            considered += 1;
+
+            let icon = match (status, conclusion) {
+                ("completed", "success") => "✅",
+                ("completed", "failure")
+                | ("completed", "timed_out")
+                | ("completed", "startup_failure") => {
                     all_passed = false;
                     "❌"
                 }
-                _ => "🔄",
+                ("completed", _) => {
+                    // cancelled / neutral / skipped etc. — not a pass.
+                    all_passed = false;
+                    "⏭️"
+                }
+                _ => {
+                    // in_progress / queued / requested: undecided, and an
+                    // unfinished run is NOT a passing signal.
+                    all_passed = false;
+                    "🔄"
+                }
             };
 
             println!(
@@ -147,6 +182,15 @@ impl CiChecker {
             if !url.is_empty() {
                 println!("     URL: {}", url);
             }
+
+            if considered >= 3 {
+                break;
+            }
+        }
+
+        if considered == 0 {
+            log::warn("No workflow runs found for the current branch");
+            return Ok(false);
         }
 
         if !all_passed {
@@ -281,6 +325,27 @@ impl CiChecker {
             );
         }
         Ok(())
+    }
+
+    /// Current git branch of the project (empty/detached HEAD → error, caller
+    /// falls back to considering all branches).
+    fn current_branch(&self) -> Result<String> {
+        let output = self
+            .runner
+            .run(
+                "git",
+                &["rev-parse", "--abbrev-ref", "HEAD"],
+                Some(&self.project_path),
+            )
+            .context("Failed to run 'git rev-parse --abbrev-ref HEAD'")?;
+        if !output.status.success() {
+            anyhow::bail!("git rev-parse failed");
+        }
+        let branch = String::from_utf8_lossy(&output.stdout).trim().to_string();
+        if branch.is_empty() || branch == "HEAD" || branch == "undefined" {
+            anyhow::bail!("detached or unnamed HEAD");
+        }
+        Ok(branch)
     }
 
     /// Try to get GitHub token from `gh auth token` CLI
