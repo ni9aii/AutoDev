@@ -52,8 +52,18 @@ impl CiChecker {
 
         log::log(&format!("Checking CI status for: {}", repo));
 
+        // Current branch, so the verdict only considers runs for what is
+        // checked out here (plan finding: the 3 most recent runs across ALL
+        // branches were deciding the verdict).
+        let current_branch = self.current_branch().ok();
+        if let Some(ref branch) = current_branch {
+            log::log(&format!("Filtering workflow runs by branch: {}", branch));
+        } else {
+            log::warn("Could not determine current branch — considering runs from all branches");
+        }
+
         let api_url = format!(
-            "https://api.github.com/repos/{}/actions/runs?per_page=5",
+            "https://api.github.com/repos/{}/actions/runs?per_page=15",
             repo
         );
 
@@ -111,8 +121,23 @@ impl CiChecker {
             .context("No workflow_runs in response")?;
 
         let mut all_passed = true;
+        let mut considered = 0usize;
 
-        for run in runs.iter().take(3) {
+        for run in runs {
+            let branch = run
+                .get("head_branch")
+                .and_then(|v| v.as_str())
+                .unwrap_or("unknown");
+
+            // Only the checked-out branch decides the verdict; unrelated
+            // feature-branch failures must not fail us (and vice versa mask
+            // our own red run).
+            if let Some(ref current) = current_branch {
+                if branch != current.as_str() {
+                    continue;
+                }
+            }
+
             let name = run
                 .get("name")
                 .and_then(|v| v.as_str())
@@ -125,19 +150,29 @@ impl CiChecker {
                 .get("conclusion")
                 .and_then(|v| v.as_str())
                 .unwrap_or("N/A");
-            let branch = run
-                .get("head_branch")
-                .and_then(|v| v.as_str())
-                .unwrap_or("unknown");
             let url = run.get("html_url").and_then(|v| v.as_str()).unwrap_or("");
 
-            let icon = match conclusion {
-                "success" => "✅",
-                "failure" => {
+            considered += 1;
+
+            let icon = match (status, conclusion) {
+                ("completed", "success") => "✅",
+                ("completed", "failure")
+                | ("completed", "timed_out")
+                | ("completed", "startup_failure") => {
                     all_passed = false;
                     "❌"
                 }
-                _ => "🔄",
+                ("completed", _) => {
+                    // cancelled / neutral / skipped etc. — not a pass.
+                    all_passed = false;
+                    "⏭️"
+                }
+                _ => {
+                    // in_progress / queued / requested: undecided, and an
+                    // unfinished run is NOT a passing signal.
+                    all_passed = false;
+                    "🔄"
+                }
             };
 
             println!(
@@ -147,6 +182,15 @@ impl CiChecker {
             if !url.is_empty() {
                 println!("     URL: {}", url);
             }
+
+            if considered >= 3 {
+                break;
+            }
+        }
+
+        if considered == 0 {
+            log::warn("No workflow runs found for the current branch");
+            return Ok(false);
         }
 
         if !all_passed {
@@ -253,12 +297,55 @@ impl CiChecker {
             }
         }
 
-        if !local_passed {
-            anyhow::bail!("Local tests failed — see output above");
-        }
+        // Fail-closed decision (see overall_outcome doc): a known repo with
+        // failing/unverifiable CI is fatal, not just a warning in the report.
+        let repo_known = repo.is_some();
+        Self::overall_outcome(repo_known, ci_passed, local_passed)?;
 
         log::success("All checks complete!");
         Ok(())
+    }
+
+    /// Fail-closed exit decision (plan finding: "ci-check exits 0 even when
+    /// GitHub Actions runs are failing").
+    ///
+    /// - Local test failure is always fatal.
+    /// - A *known* repo whose CI is failing OR could not be verified (API
+    ///   error, rate limit, zero runs) is fatal: the tool's purpose is to gate
+    ///   on remote CI, so silence must not mean green.
+    /// - An unknown repo (not GitHub / no origin) cannot be checked remotely:
+    ///   warn-only, decided locally.
+    fn overall_outcome(repo_known: bool, ci_passed: bool, local_passed: bool) -> Result<()> {
+        if !local_passed {
+            anyhow::bail!("Local tests failed — see output above");
+        }
+        if repo_known && !ci_passed {
+            anyhow::bail!(
+                "GitHub Actions CI is failing or could not be verified — see output above"
+            );
+        }
+        Ok(())
+    }
+
+    /// Current git branch of the project (empty/detached HEAD → error, caller
+    /// falls back to considering all branches).
+    fn current_branch(&self) -> Result<String> {
+        let output = self
+            .runner
+            .run(
+                "git",
+                &["rev-parse", "--abbrev-ref", "HEAD"],
+                Some(&self.project_path),
+            )
+            .context("Failed to run 'git rev-parse --abbrev-ref HEAD'")?;
+        if !output.status.success() {
+            anyhow::bail!("git rev-parse failed");
+        }
+        let branch = String::from_utf8_lossy(&output.stdout).trim().to_string();
+        if branch.is_empty() || branch == "HEAD" || branch == "undefined" {
+            anyhow::bail!("detached or unnamed HEAD");
+        }
+        Ok(branch)
     }
 
     /// Try to get GitHub token from `gh auth token` CLI
@@ -333,4 +420,40 @@ fn main() -> Result<()> {
     let checker = CiChecker::new(args.project_path.clone());
     checker.run(&args)?;
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // Matrix tests for the fail-closed exit decision. This is the gate that
+    // decides whether the verify/release phases proceed, so every combination
+    // is pinned explicitly.
+    #[test]
+    fn outcome_all_passed_is_ok() {
+        assert!(CiChecker::overall_outcome(true, true, true).is_ok());
+    }
+
+    #[test]
+    fn outcome_failing_ci_with_known_repo_fails_closed() {
+        // Regression: previously exited 0 when remote CI failed but local
+        // tests passed — releases could be tagged on a red repo.
+        let err = CiChecker::overall_outcome(true, false, true)
+            .expect_err("known repo + failing CI must fail");
+        assert!(err.to_string().contains("CI"));
+    }
+
+    #[test]
+    fn outcome_local_failure_always_fatal() {
+        assert!(CiChecker::overall_outcome(true, true, false).is_err());
+        assert!(CiChecker::overall_outcome(false, true, false).is_err());
+        assert!(CiChecker::overall_outcome(false, false, false).is_err());
+    }
+
+    #[test]
+    fn outcome_unknown_repo_cannot_fail_on_ci() {
+        // Non-GitHub / origin-less repos: remote CI unknowable → warn-only,
+        // decision falls to local results.
+        assert!(CiChecker::overall_outcome(false, false, true).is_ok());
+    }
 }

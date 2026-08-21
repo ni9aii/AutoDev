@@ -10,12 +10,13 @@ Common issues when integrating or running AutoDev.
 [auto-dev] ERROR Or use --hermes-mode for delegate_task-based execution.
 ```
 
-This only happens in **legacy mode** (no `--hermes-mode`), which shells out to
+This only happens in **legacy mode** (`--legacy-claude`), which shells out to
 `claude -p`. The pre-flight auth check caught an expired/missing OAuth session.
 
-**Fix:** run `--hermes-mode`. It never calls `claude`, so it works regardless of
-Claude Code's auth state (see issue #1). If you specifically need legacy mode,
-re-authenticate with `claude` interactively.
+**Fix:** drop `--legacy-claude` and use the default delegate_task mode. It never
+calls `claude`, so it works regardless of Claude Code's auth state (see issue
+#1). If you specifically need legacy mode, re-authenticate with `claude`
+interactively.
 
 ## `review-aggregator` exits with "No review directories found"
 
@@ -69,5 +70,5 @@ Override the root with `--dev-notes-root` or `DEV_NOTES_ROOT`.
 If you capture both, the JSON is buried. Redirect stderr:
 
 ```bash
-run-pipeline . full --hermes-mode --json 2>/dev/null
+run-pipeline . full --json 2>/dev/null
 ```

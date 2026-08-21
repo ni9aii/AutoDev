@@ -56,7 +56,7 @@ The skill is the product. The fastest path is the one-command installer:
 
 | Harness      | Install path                                      | Invoke with        |
 |--------------|---------------------------------------------------|--------------------|
-| Hermes       | `~/.hermes/skills/autonomous-ai-agents/autodev`  | `/skill autodev`  |
+| Hermes       | `~/.hermes/skills/autonomous-ai-agents/autodev`   | `/skill autodev`   |
 | Claude Code  | `~/.claude/skills/autodev`                        | `/autodev`         |
 
 After install, load the skill in your agent and run a phase, e.g.
