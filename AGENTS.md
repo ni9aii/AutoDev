@@ -46,6 +46,6 @@ bash tools/gen.sh && git diff --exit-code   # skill drift check
 ## Dogfooding note
 
 AutoDev runs on itself. Review reports land in
-~/Notes/dev-notes/AutoDev/reviews/<timestamp>/ (4 files: code, security,
-architecture, devops), plans in ~/Notes/dev-notes/AutoDev/plans/. When you fix
+`<dev-notes-root>/AutoDev/reviews/<timestamp>/` (4 files: code, security,
+architecture, devops), plans in `<dev-notes-root>/AutoDev/plans/`. When you fix
 something found by a dogfood run, mention the run's timestamp dir in the commit body.
