@@ -132,6 +132,11 @@ GitHub Actions with an ubuntu + windows matrix:
 
 ### `review` — reviewers
 
+**Phase-0 (before launching reviewers):** check the project root for
+`AGENTS.md`. If absent, generate it from the template in
+`references/agents-md-bootstrap.md` and commit it as the first fix. If
+present, read it — its rules override `references/rust-conventions.md`.
+
 Launch the four reviewers (code, security, architecture, devops) as **4
 parallel sub-agents via the Workflow tool**. Each reads the sources and writes
 its report to:
@@ -149,6 +154,10 @@ Description. File: `path/to/file.rs`. Line: 42.
 ### [MINOR] ...
 
 Save to: <output-path>
+
+Each reviewer loads `references/rust-conventions.md` (the user's Rust quality
+bar) and, when present, the project's `AGENTS.md`, and enforces both in
+addition to its own role checklist.
 
 ### `plan` — aggregation
 
@@ -174,6 +183,9 @@ Read the latest plan from `$DEV_NOTES_ROOT/<project>/plans/`. For each fix in th
 - **Complex fixes**: delegate to an `Agent` sub-agent.
   Commit after each fix; push promptly. Do NOT add a `Co-Authored-By: Claude`
   trailer to commits.
+
+Before declaring any fix complete, walk the hard rules in
+`references/rust-conventions.md` over your own diff.
 
 ### `full` — full pipeline
 
@@ -226,6 +238,8 @@ $DEV_NOTES_ROOT/
 | `references/dev-notes-schema.md` | Exact dev-notes layout, artifact paths, finding format |
 | `references/json-output.md` | `run-pipeline --json` output contract |
 | `references/iteration-2-patterns.md` | Report parser patterns, Do Now/Defer, regression checklist |
+| `references/rust-conventions.md` | The user's Rust quality bar: hard rules, style, process — reviewers and executors load this |
+| `references/agents-md-bootstrap.md` | Phase-0 AGENTS.md protocol + template for target repos |
 | `references/troubleshooting.md` | FAQ: Claude auth, empty reviews, dev-notes not found |
 | `references/git-sync-checklist.md` | Pre/post-work git sync steps |
 
