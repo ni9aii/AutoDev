@@ -8,18 +8,18 @@ and parsing.
 ## Example
 
 ```bash
-run-pipeline /path/to/project review --hermes-mode --json 2>/dev/null
+run-pipeline /path/to/project review --json 2>/dev/null
 ```
 
 ```json
 {
-  "status": "success",
-  "version": "0.4.0",
-  "project": "/path/to/project",
-  "phase": "review",
-  "mode": "hermes",
-  "timestamp": "20260713_063104",
-  "output_dir": "/home/you/obsidian-vault/dev-notes/AutoDev/reviews/20260713_063104"
+ "status": "success",
+ "version": "0.4.0",
+ "project": "/path/to/project",
+ "phase": "review",
+ "mode": "hermes",
+ "timestamp": "20260713_063104",
+ "output_dir": "/home/you/obsidian-vault/dev-notes/AutoDev/reviews/20260713_063104"
 }
 ```
 
@@ -38,8 +38,8 @@ run-pipeline /path/to/project review --hermes-mode --json 2>/dev/null
 ## Notes for integrators
 
 - **Parse stdout, ignore stderr.** Log lines carry an `[auto-dev]` prefix and
-  go to stderr; only the JSON object is on stdout.
+ go to stderr; only the JSON object is on stdout.
 - On a fatal error the process exits non-zero and prints an error to stderr;
-  no JSON is emitted. Check the exit code before parsing stdout.
+ no JSON is emitted. Check the exit code before parsing stdout.
 - The `output_dir` is where the run wrote (or would write) its reviews/plans;
-  use it to locate generated artifacts after a successful run.
+ use it to locate generated artifacts after a successful run.

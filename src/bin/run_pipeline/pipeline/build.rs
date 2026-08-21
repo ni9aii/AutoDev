@@ -32,7 +32,7 @@ impl Pipeline {
         let dev_notes_root =
             auto_dev_pipeline::git::paths::resolve_dev_notes_root(args.dev_notes_root.as_ref())?;
 
-        let output_dir = if args.hermes_mode {
+        let output_dir = if !args.hermes_mode {
             let project = args
                 .project
                 .clone()
@@ -61,7 +61,8 @@ impl Pipeline {
             project_path,
             phase: args.phase,
             version: args.version,
-            hermes_mode: args.hermes_mode,
+            // CLI flag is --legacy-claude (opt-in); hermes_mode is its negation.
+            hermes_mode: !args.hermes_mode,
             project_name: args.project,
             timestamp,
             output_dir,

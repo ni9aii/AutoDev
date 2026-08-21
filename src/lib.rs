@@ -406,8 +406,24 @@ pub mod git {
             validate_github_slug(repo)?;
             Ok(format!("{}/{}", owner, repo))
         } else {
-            anyhow::bail!("Not a GitHub repository: {}", remote_url)
+            // Redact userinfo before echoing the remote anywhere (plan finding:
+            // credential-bearing remote URL leaked into error messages that
+            // reach stderr/logs). Remotes like https://x-access-token:TOKEN@…
+            // are exactly the non-GitHub case this error fires for.
+            anyhow::bail!("Not a GitHub repository: {}", redact_url(&remote_url))
         }
+    }
+
+    /// Replace `user:password@` userinfo in a URL-ish string with `***@` so
+    /// tokens never land in logs or error output. Keeps the scheme prefix
+    /// (`https://`, `ssh://`) and everything after the userinfo.
+    #[cfg_attr(not(test), allow(dead_code))]
+    pub(crate) fn redact_url(url: &str) -> String {
+        static USERINFO_RE: Lazy<Regex> = Lazy::new(|| {
+            Regex::new(r"(^[a-zA-Z][a-zA-Z0-9+.-]*://)[^/@\s]+:[^/@\s]+@")
+                .expect("Invalid USERINFO_RE pattern")
+        });
+        USERINFO_RE.replace_all(url, "${1}***@").to_string()
     }
 
     fn validate_github_slug(slug: &str) -> Result<()> {
@@ -740,6 +756,51 @@ mod tests {
 
         let repo = git::get_repo_info(std::path::Path::new("."), &mock).unwrap();
         assert_eq!(repo, "ni9aii/AutoDev");
+    }
+
+    #[test]
+    fn test_get_repo_info_redacts_credentials_in_error() {
+        use process::{mock_output, MockRunner};
+
+        // Regression (plan finding: credential-bearing remote URL echoed
+        // verbatim): a non-GitHub remote with embedded token must never reach
+        // the error message with the secret intact.
+        let mock = MockRunner::new();
+        mock.push_response(mock_output(
+            true,
+            "https://x-access-token:ghs_SUPERSECRET@gitlab.example.com/acme/widget.git\n",
+            "",
+        ));
+        let err = git::get_repo_info(std::path::Path::new("."), &mock)
+            .expect_err("non-GitHub remote must fail");
+        let msg = err.to_string();
+        assert!(!msg.contains("ghs_SUPERSECRET"), "token leaked: {}", msg);
+        assert!(msg.contains("***@"), "userinfo not redacted: {}", msg);
+        assert!(msg.contains("gitlab.example.com"), "host lost: {}", msg);
+    }
+
+    #[test]
+    fn test_redact_url_variants() {
+        // https + user:pass
+        assert_eq!(
+            git::redact_url("https://user:pass@example.com/repo.git"),
+            "https://***@example.com/repo.git"
+        );
+        // ssh-style scp syntax has no scheme → nothing matches → unchanged
+        assert_eq!(
+            git::redact_url("git@github.com:owner/repo.git"),
+            "git@github.com:owner/repo.git"
+        );
+        // ssh:// scheme with userinfo
+        assert_eq!(
+            git::redact_url("ssh://oauth2:TOKEN@gitlab.com/group/proj.git"),
+            "ssh://***@gitlab.com/group/proj.git"
+        );
+        // no userinfo → unchanged
+        assert_eq!(
+            git::redact_url("https://github.com/owner/repo.git"),
+            "https://github.com/owner/repo.git"
+        );
     }
 
     #[test]
