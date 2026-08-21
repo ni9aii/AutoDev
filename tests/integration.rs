@@ -153,7 +153,7 @@ fn integration_run_pipeline_json_is_valid() {
         .args([
             ".",
             "review",
-            "--hermes-mode",
+            
             "--json",
             "--dev-notes-root",
             td.path.to_str().unwrap(),
@@ -194,7 +194,7 @@ fn integration_run_pipeline_plan_end_to_end() {
         .args([
             td.path.to_str().unwrap(),
             "plan",
-            "--hermes-mode",
+            
             "--dev-notes-root",
             td.path.to_str().unwrap(),
             "--project",
@@ -252,7 +252,7 @@ fn integration_run_pipeline_full_end_to_end() {
         .args([
             td.path.to_str().unwrap(),
             "full",
-            "--hermes-mode",
+            
             "--dev-notes-root",
             td.path.to_str().unwrap(),
             "--project",
@@ -311,7 +311,7 @@ fn integration_run_pipeline_release_requires_version() {
     assert!(init.success(), "git init failed");
 
     let out = Command::new(env!("CARGO_BIN_EXE_run-pipeline"))
-        .args([td.path.to_str().unwrap(), "release", "--hermes-mode"])
+        .args([td.path.to_str().unwrap(), "release"])
         .output()
         .expect("spawn run-pipeline");
 

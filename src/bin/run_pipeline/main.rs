@@ -49,9 +49,12 @@ struct Args {
     #[arg(short = 'V', long = "release-version")]
     version: Option<String>,
 
-    /// Hermes mode: use delegate_task instead of Claude CLI (default)
-    #[arg(long, default_value = "true")]
-    hermes_mode: bool,
+    /// Hermes mode: reviews are performed by delegate_task subagents (default).
+    /// Legacy mode shells out to the Claude Code CLI; opt in with
+    /// `--legacy-claude` (plan finding: `--hermes-mode` with SetTrue +
+    /// default=true could never be disabled, leaving legacy code unreachable).
+    #[arg(long = "legacy-claude", default_value = "false")]
+    hermes_mode: bool, // true when NOT --legacy-claude
 
     /// Project name for dev-notes path construction
     #[arg(long)]

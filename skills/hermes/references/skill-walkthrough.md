@@ -9,7 +9,7 @@ shows the `delegate_task` mechanics) with the end-to-end picture.
 - **Hermes Agent:** `/skill autodev` then follow the skill's prompts.
 - **Claude Code:** load `skills/claude-code/SKILL.md` as a skill.
 - **Other harnesses:** point the harness at `SKILL.md` (keep `references/`
-  alongside it).
+ alongside it).
 
 No terminal invocation is required — the agent runs the pipeline with its own
 native tools. The Rust binaries are optional accelerators.
@@ -48,7 +48,7 @@ For each Do Now fix:
 
 - **≤2 files, ≤20 lines** → `read_file` + `patch` directly.
 - **Otherwise** → `delegate_task` with the fix title, severity, file, and
-  description.
+ description.
 
 Deferred items are documented in the plan and skipped.
 
@@ -82,7 +82,7 @@ until a max-iteration cap is hit (default 5). Then report the result.
 When wrapping the binary from your own code, pass `--json`:
 
 ```bash
-run-pipeline /path/to/project full --hermes-mode --json
+run-pipeline /path/to/project full --json
 ```
 
 The summary is emitted on **stdout** (parse it); all human log output goes to

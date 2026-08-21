@@ -74,23 +74,24 @@ If you installed the binaries (`cargo build --release`), `run-pipeline` can
 orchestrate the whole pipeline for you:
 
 ```bash
-# Full pipeline (agent-native inside the binary)
-run-pipeline /path/to/project full --hermes-mode --project myproject
+# Full pipeline (agent-native inside the binary; delegate_task mode is the default)
+run-pipeline /path/to/project full --project myproject
 
 # Review only
-run-pipeline /path/to/project review --hermes-mode --project myproject
+run-pipeline /path/to/project review --project myproject
 
 # Review + plan
-run-pipeline /path/to/project plan --hermes-mode --project myproject
+run-pipeline /path/to/project plan --project myproject
 
 # Release (same in both modes)
 run-pipeline /path/to/project release --release-version v0.6.0
 ```
 
 > **Legacy mode** (shells out to the `claude -p` CLI) exists for agents that
-> wrap Claude Code. `run-pipeline` runs a pre-flight auth check and fails fast
-> with a clear message if the CLI is missing or its OAuth session is expired.
-> When Claude Code auth is unavailable, use `--hermes-mode`.
+> wrap Claude Code; opt in with `--legacy-claude`. `run-pipeline` runs a
+> pre-flight auth check and fails fast with a clear message if the CLI is
+> missing or its OAuth session is expired. When Claude Code auth is
+> unavailable, stay in the default delegate_task mode.
 
 ## Build (optional)
 
