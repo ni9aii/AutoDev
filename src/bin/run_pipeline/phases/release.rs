@@ -58,46 +58,33 @@ impl Pipeline {
         }
         log::success("Tag pushed to origin");
 
-        // Create GitHub Release via API (reqwest — token stays in process memory)
+        // Create GitHub Release via shared client (token stays in process memory)
         log::log("Creating GitHub Release...");
         let repo = git::get_repo_info(&self.project_path, self.runner.as_ref())?;
-        let token = std::env::var("GITHUB_TOKEN")
-            .or_else(|_| std::env::var("GITHUB_PAT"))
-            .context("GITHUB_TOKEN or GITHUB_PAT must be set")?;
+        let token = auto_dev_pipeline::github::resolve_token(self.runner.as_ref())?
+            .context("No GitHub token found (GITHUB_PAT / GITHUB_TOKEN / gh auth token)")?;
 
-        let release_url = url::Url::parse("https://api.github.com/repos/")
-            .and_then(|base| base.join(&format!("{}/releases/", repo)))
-            .context("Failed to build GitHub release URL")?;
-        let release_body = format!(
-            "{{\"tag_name\":\"{}\",\"name\":\"Release {}\",\"body\":\"Auto-generated release\",\"draft\":false,\"prerelease\":false}}",
-            version, version
-        );
+        let (status, body) = auto_dev_pipeline::github::create_release(
+            &repo,
+            version,
+            &format!("Release {}", version),
+            "Auto-generated release",
+            &token,
+        )?;
 
-        let client = reqwest::blocking::Client::builder()
-            .timeout(std::time::Duration::from_secs(30))
-            .build()
-            .context("Failed to create HTTP client")?;
-        let response = client
-            .post(release_url)
-            .header("Accept", "application/vnd.github+json")
-            .bearer_auth(token)
-            .header(
-                "User-Agent",
-                format!("auto-dev-pipeline/{}", env!("CARGO_PKG_VERSION")),
-            )
-            .body(release_body)
-            .send()
-            .context("Failed to create GitHub release")?;
-
-        if response.status().is_success() {
+        if status.is_success() {
             log::success(&format!("GitHub Release {} created", version));
         } else {
-            let status = response.status();
-            let body = response.text().unwrap_or_default();
-            log::warn(&format!(
-                "GitHub release creation failed ({}): {}",
-                status, body
-            ));
+            // Fatal (plan finding: partial release reported as success — tag
+            // pushed but release missing must not look like a completed
+            // release).
+            anyhow::bail!(
+                "GitHub release creation failed ({}): {}. Tag {} is already pushed — \
+                 create the release manually or delete the tag before retrying.",
+                status,
+                body,
+                version
+            );
         }
 
         log::success(&format!("Release {} complete", version));

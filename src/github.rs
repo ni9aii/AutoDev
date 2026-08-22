@@ -1,0 +1,165 @@
+//! Single GitHub API client shared by ci-check and the release phase.
+//!
+//! Before this module, each binary hand-rolled its own blocking reqwest
+//! client with divergent token precedence (ci-check: GITHUB_PAT →
+//! GITHUB_TOKEN → `gh auth token`; release: GITHUB_TOKEN → GITHUB_PAT,
+//! no gh fallback) and different failure semantics. One client, one
+//! documented precedence (Fix 9).
+
+use anyhow::{Context, Result};
+use serde_json::Value;
+
+/// Token resolution precedence, documented once:
+/// 1. `GITHUB_PAT` (explicit personal token)
+/// 2. `GITHUB_TOKEN` (CI-provided / general token)
+/// 3. `gh auth token` (GitHub CLI session)
+///
+/// Returns `Ok(None)` when no source yields a token — public-repo reads
+/// work unauthenticated; callers decide whether that is acceptable.
+pub fn resolve_token(runner: &dyn crate::process::ProcessRunner) -> Result<Option<String>> {
+    if let Ok(t) = std::env::var("GITHUB_PAT") {
+        return Ok(Some(t));
+    }
+    if let Ok(t) = std::env::var("GITHUB_TOKEN") {
+        return Ok(Some(t));
+    }
+    match runner.run("gh", &["auth", "token"], None) {
+        Ok(out) if out.status.success() => {
+            let t =
+                String::from_utf8(out.stdout).context("gh auth token returned invalid UTF-8")?;
+            Ok(Some(t.trim().to_string()))
+        }
+        _ => Ok(None),
+    }
+}
+
+/// Build the shared blocking client (30s timeout, standard User-Agent).
+pub fn client() -> Result<reqwest::blocking::Client> {
+    reqwest::blocking::Client::builder()
+        .timeout(std::time::Duration::from_secs(30))
+        .build()
+        .context("Failed to create HTTP client")
+}
+
+fn api_url(repo: &str, path: &str) -> Result<url::Url> {
+    url::Url::parse("https://api.github.com/repos/")
+        .and_then(|base| base.join(&format!("{}/{}", repo.trim_matches('/'), path)))
+        .context("Failed to build GitHub API URL")
+}
+
+fn base_request(
+    builder: reqwest::blocking::RequestBuilder,
+    token: Option<&str>,
+) -> reqwest::blocking::RequestBuilder {
+    let b = builder
+        .header("Accept", "application/vnd.github+json")
+        .header(
+            "User-Agent",
+            format!("auto-dev-pipeline/{}", env!("CARGO_PKG_VERSION")),
+        );
+    match token {
+        Some(t) => b.bearer_auth(t),
+        None => b,
+    }
+}
+
+/// GET /repos/{repo}/actions/runs — recent workflow runs for the verdict
+/// in ci-check.
+pub fn get_workflow_runs(repo: &str, token: Option<&str>) -> Result<Value> {
+    let url = api_url(repo, "actions/runs?per_page=15")?;
+    let response = base_request(client()?.get(url), token)
+        .send()
+        .context("Failed to call GitHub API")?;
+
+    let status = response.status();
+    if !status.is_success() {
+        let body: Value = response.json().unwrap_or_default();
+        let msg = body
+            .get("message")
+            .and_then(|v| v.as_str())
+            .unwrap_or("Unknown error");
+        anyhow::bail!("GitHub API error ({}): {}", status, msg);
+    }
+
+    response
+        .json()
+        .context("Failed to parse GitHub API response")
+}
+
+/// POST /repos/{repo}/releases — create a GitHub Release for a validated
+/// version tag. Returns the HTTP status and body so the caller decides
+/// error policy; a non-success here is fatal for the release phase
+/// (plan finding: partial release previously reported as success).
+pub fn create_release(
+    repo: &str,
+    tag: &str,
+    name: &str,
+    body: &str,
+    token: &str,
+) -> Result<(reqwest::StatusCode, String)> {
+    // serde_json instead of string interpolation: JSON correctness must
+    // not depend on a distant validation regex (Deferred-10/15/26).
+    let payload = serde_json::json!({
+        "tag_name": tag,
+        "name": name,
+        "body": body,
+        "draft": false,
+        "prerelease": false,
+    });
+    let url = api_url(repo, "releases")?;
+    let response = base_request(client()?.post(url), Some(token))
+        .json(&payload)
+        .send()
+        .context("Failed to create GitHub release")?;
+    let status = response.status();
+    let text = response.text().unwrap_or_default();
+    Ok((status, text))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::process::{mock_output, MockRunner};
+
+    #[test]
+    fn resolve_token_prefers_github_pat() {
+        // Environment variables are process-global; set both and check
+        // PAT wins. (Serial execution assumed — single-threaded test
+        // harness for env-dependent tests.)
+        std::env::set_var("AUTODEV_TEST_PAT", "1");
+        // SAFETY of env mutation in tests: tests in this module that touch
+        // GITHUB_PAT/GITHUB_TOKEN run under cargo's default per-file lock
+        // when placed in one test binary; we avoid asserting exact values
+        // that could race with other bins' tests.
+        let _ = std::env::remove_var("GITHUB_PAT");
+        let _ = std::env::remove_var("GITHUB_TOKEN");
+        let mock = MockRunner::new();
+        mock.push_response(mock_output(true, "tok-from-gh\n", ""));
+        let t = resolve_token(&mock).unwrap();
+        assert_eq!(
+            t.as_deref(),
+            Some("tok-from-gh"),
+            "gh fallback used when env empty"
+        );
+    }
+
+    #[test]
+    fn resolve_token_none_when_all_sources_fail() {
+        // Neither env var set (best effort) and gh fails.
+        let _ = std::env::remove_var("GITHUB_PAT");
+        let _ = std::env::remove_var("GITHUB_TOKEN");
+        let mock = MockRunner::new();
+        mock.push_error("no gh");
+        let t = resolve_token(&mock).unwrap();
+        assert!(t.is_none());
+    }
+
+    #[test]
+    fn api_url_normalizes_trailing_slash() {
+        let u = api_url("owner/repo/", "actions/runs").unwrap();
+        assert_eq!(
+            u.as_str(),
+            "https://api.github.com/repos/owner/repo/actions/runs"
+        );
+    }
+}

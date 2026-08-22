@@ -606,6 +606,8 @@ pub mod markdown {
     }
 }
 
+pub mod github;
+
 #[cfg(test)]
 mod tests {
     use super::*;
