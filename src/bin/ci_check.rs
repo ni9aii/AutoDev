@@ -41,13 +41,10 @@ impl CiChecker {
     }
 
     fn check_ci_status(&self, repo: &str) -> Result<bool> {
-        let token = std::env::var("GITHUB_PAT")
-            .ok()
-            .or_else(|| std::env::var("GITHUB_TOKEN").ok())
-            .or_else(|| self.gh_auth_token().ok());
+        let token = auto_dev_pipeline::github::resolve_token(self.runner.as_ref())?;
 
         if token.is_none() {
-            log::warn("GITHUB_PAT not set and gh auth token failed, trying without auth (public repos only)");
+            log::warn("No token found (GITHUB_PAT/GITHUB_TOKEN/gh auth) — trying without auth (public repos only)");
         }
 
         log::log(&format!("Checking CI status for: {}", repo));
@@ -62,46 +59,8 @@ impl CiChecker {
             log::warn("Could not determine current branch — considering runs from all branches");
         }
 
-        let api_url = format!(
-            "https://api.github.com/repos/{}/actions/runs?per_page=15",
-            repo
-        );
-
-        let client = reqwest::blocking::Client::builder()
-            .timeout(std::time::Duration::from_secs(30))
-            .build()
-            .context("Failed to create HTTP client")?;
-        let mut request = client
-            .get(&api_url)
-            .header("Accept", "application/vnd.github+json")
-            .header(
-                "User-Agent",
-                format!("auto-dev-pipeline/{}", env!("CARGO_PKG_VERSION")),
-            );
-
-        if let Some(ref token) = token {
-            request = request.header("Authorization", format!("Bearer {}", token));
-        }
-
-        let response = request.send().context("Failed to call GitHub API")?;
-        let status = response.status();
-
-        if !status.is_success() {
-            let body: serde_json::Value = response.json().unwrap_or_default();
-            let msg = body
-                .get("message")
-                .and_then(|v| v.as_str())
-                .unwrap_or("Unknown error");
-
-            if status.as_u16() == 403 {
-                log::warn("Rate limit exceeded. Set GITHUB_PAT for higher limits.");
-            }
-            anyhow::bail!("GitHub API error ({}): {}", status, msg);
-        }
-
-        let data: serde_json::Value = response
-            .json()
-            .context("Failed to parse GitHub API response")?;
+        let data: serde_json::Value =
+            auto_dev_pipeline::github::get_workflow_runs(repo, token.as_deref())?;
 
         let total_count = data
             .get("total_count")
@@ -175,12 +134,14 @@ impl CiChecker {
                 }
             };
 
-            println!(
+            // stderr: this is human status output; stdout of ci-check must
+            // stay clean for the --json piping contract.
+            eprintln!(
                 "  {} {}: {} ({}) on {}",
                 icon, name, status, conclusion, branch
             );
             if !url.is_empty() {
-                println!("     URL: {}", url);
+                eprintln!("     URL: {}", url);
             }
 
             if considered >= 3 {
@@ -346,23 +307,6 @@ impl CiChecker {
             anyhow::bail!("detached or unnamed HEAD");
         }
         Ok(branch)
-    }
-
-    /// Try to get GitHub token from `gh auth token` CLI
-    fn gh_auth_token(&self) -> Result<String> {
-        let output = self
-            .runner
-            .run("gh", &["auth", "token"], None)
-            .context("Failed to run 'gh auth token'")?;
-
-        if !output.status.success() {
-            let stderr = String::from_utf8_lossy(&output.stderr);
-            anyhow::bail!("gh auth token failed: {}", stderr);
-        }
-
-        let token =
-            String::from_utf8(output.stdout).context("gh auth token returned invalid UTF-8")?;
-        Ok(token.trim().to_string())
     }
 
     fn save_dev_notes_report(
