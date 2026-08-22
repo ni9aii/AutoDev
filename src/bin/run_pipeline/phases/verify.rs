@@ -36,8 +36,11 @@ impl Pipeline {
             anyhow::bail!("CI check failed: {}", stderr);
         }
 
-        let stdout = String::from_utf8_lossy(&ci_output.stdout);
-        print!("{}", stdout);
+        // ci-check's human output is already on ITS stderr (stdout purity
+        // contract, json-output.md); forward that instead of its stdout so a
+        // `full --json` run keeps stdout JSON-only.
+        let stderr = String::from_utf8_lossy(&ci_output.stderr);
+        eprint!("{}", stderr);
 
         log::success("Verification complete");
         Ok(())

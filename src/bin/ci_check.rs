@@ -134,12 +134,14 @@ impl CiChecker {
                 }
             };
 
-            println!(
+            // stderr: this is human status output; stdout of ci-check must
+            // stay clean for the --json piping contract.
+            eprintln!(
                 "  {} {}: {} ({}) on {}",
                 icon, name, status, conclusion, branch
             );
             if !url.is_empty() {
-                println!("     URL: {}", url);
+                eprintln!("     URL: {}", url);
             }
 
             if considered >= 3 {
