@@ -341,7 +341,16 @@ fn integration_run_pipeline_release_requires_version() {
     assert!(init.success(), "git init failed");
 
     let out = Command::new(env!("CARGO_BIN_EXE_run-pipeline"))
-        .args([td.path.to_str().unwrap(), "release"])
+        .args([
+            td.path.to_str().unwrap(),
+            "release",
+            // Point dev-notes at the temp dir: Pipeline::new resolves the
+            // dev-notes root and creates the output dir BEFORE release-phase
+            // argument validation, so without this flag every test run would
+            // leak an empty directory tree into the real ~/obsidian-vault.
+            "--dev-notes-root",
+            td.path.to_str().unwrap(),
+        ])
         .output()
         .expect("spawn run-pipeline");
 
