@@ -19,7 +19,10 @@
 #   harnesses/hermes.overlay      -> ./skills/hermes/SKILL.md
 #   harnesses/claude-code.overlay -> ./skills/claude-code/SKILL.md
 #
-# Each rendered skill gets a self-contained references/ copy alongside it.
+# Each non-root skill gets its references/ directory as a RELATIVE SYMLINK
+# (../../references) pointing at the canonical root references/. install.sh
+# dereferences the symlink at install time, so installed skills still get real
+# files — while the repo itself keeps exactly one copy of each reference.
 #
 # Run:  bash tools/gen.sh
 # Check: git diff --exit-code   # fails if a committed surface drifted from source
@@ -92,34 +95,22 @@ render() {
   printf '%s\n' "$out"
 }
 
-copy_references() {
+link_references() {
   local dest_skill="$1"
   local dest_ref
   dest_ref="$(dirname "$dest_skill")/references"
-  [ -d "$REFERENCES" ] || return 0
-  # Root skill already lives next to references/ — nothing to copy.
-  [ "$(realpath "$dest_ref")" = "$(realpath "$REFERENCES")" ] && return 0
 
-  # Mirror, don't accumulate (Fix 7): plain cp left orphan copies behind when
-  # a source reference was deleted/renamed, and the drift check stayed green
-  # because unchanged orphans produce no diff. rsync --delete makes the copy
-  # exactly equal to the source set.
-  mkdir -p "$dest_ref"
+  # Root skill already lives next to references/ — nothing to link.
+  [ "$(realpath "$dest_skill")" = "$ROOT/SKILL.md" ] && return 0
 
-  # GENERATED banner: prepend a do-not-edit header to every copied file so
-  # nobody edits a copy and wonders why gen.sh overwrites it.
-  local tmpdir
-  tmpdir="$(mktemp -d)"
-  for f in "$REFERENCES"/*.md; do
-    [ -e "$f" ] || continue
-    {
-      echo "<!-- GENERATED from references/$(basename "$f") by tools/gen.sh — edit the source, not this copy. -->"
-      echo
-      cat "$f"
-    } > "$tmpdir/$(basename "$f")"
-  done
-  rsync --delete -a "$tmpdir/" "$dest_ref/"
-  rm -rf "$tmpdir"
+  # Idempotent: already a correctly-pointing symlink — do nothing.
+  if [ -L "$dest_ref" ] && [ "$(readlink "$dest_ref")" = "../../references" ]; then
+    return 0
+  fi
+
+  rm -rf "$dest_ref"
+  ln -s ../../references "$dest_ref"
+  echo "linked: $dest_ref -> ../../references"
 }
 
 [ -f "$CORE" ] || { echo "ERROR: $CORE missing" >&2; exit 1; }
@@ -133,7 +124,7 @@ for entry in "${TARGETS[@]}"; do
   target="$ROOT/$rel_target"
   mkdir -p "$(dirname "$target")"
   printf '%s' "$rendered" > "$target"
-  copy_references "$target"
+  link_references "$target"
   echo "rendered: $rel_target"
 done
 

@@ -93,7 +93,7 @@ jobs:
 
       - name: Fail if any rendered skill drifted from source
         run: |
-          if ! git diff --exit-code -- SKILL.md skills/hermes/SKILL.md skills/claude-code/SKILL.md skills/hermes/references skills/claude-code/references; then
+          if ! git diff --exit-code -- SKILL.md skills/hermes/SKILL.md skills/claude-code/SKILL.md; then
             echo "::error::Rendered skills drifted from SKILL.core.md/harnesses/*.overlay."
             echo "Run 'bash tools/gen.sh' locally and commit the result."
             exit 1
@@ -109,28 +109,12 @@ jobs:
           fi
           echo "== frontmatter present =="
           test "$(head -1 SKILL.md)" = '---' || { echo "::error::SKILL.md missing frontmatter"; exit 1; }
-          echo "== references copied =="
-          test -f skills/hermes/references/skill-walkthrough.md || { echo "::error::hermes references missing"; exit 1; }
-          test -f skills/claude-code/references/skill-walkthrough.md || { echo "::error::claude-code references missing"; exit 1; }
-          echo "== no orphan reference copies (mirror, don't accumulate) =="
-          # Every file in skills/<h>/references/ must exist in references/;
-          # anything else is an immortal orphan from a deleted source (Fix 7).
+          echo "== references symlinks valid =="
           for h in hermes claude-code; do
-            for f in "skills/$h/references"/*.md; do
-              base="$(basename "$f")"
-              test -f "references/$base" || { echo "::error::orphan copy: $f has no source references/$base — delete it or restore the source"; exit 1; }
-            done
-            # And every source must be mirrored (copy step ran above).
-            for f in references/*.md; do
-              base="$(basename "$f")"
-              test -f "skills/$h/references/$base" || { echo "::error::$f not mirrored into skills/$h/references/"; exit 1; }
-            done
-          done
-          echo "== GENERATED banner present on copies =="
-          for h in hermes claude-code; do
-            for f in "skills/$h/references"/*.md; do
-              head -1 "$f" | grep -q "GENERATED from references/" || { echo "::error::$f missing GENERATED banner"; exit 1; }
-            done
+            test -L "skills/$h/references" || { echo "::error::skills/$h/references must be a symlink"; exit 1; }
+            test "$(readlink "skills/$h/references")" = "../../references" || { echo "::error::skills/$h/references wrong target: $(readlink "skills/$h/references")"; exit 1; }
+            # readability through the link proves the link resolves in CI checkout
+            head -1 "skills/$h/references/troubleshooting.md" >/dev/null || { echo "::error::cannot read through symlink for $h"; exit 1; }
           done
           echo "== artifact path contract consistent across surfaces =="
           # The aggregator reads reviews/<YYYYMMDD_HHMMSS>/<role>-review.md.

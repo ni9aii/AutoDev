@@ -51,8 +51,9 @@ The skill is the product. The fastest path is the one-command installer:
 ```
 
 `install.sh` re-renders the skill from `SKILL.core.md` + `harnesses/*.overlay`
-(see "How the skill is built" below) and copies the right `SKILL.md` (with its
-`references/`) into your harness's skill directory. Currently supported:
+(see "How the skill is built" below) and installs the right `SKILL.md` (with a
+dereferenced, self-contained copy of `references/`) into your harness's skill
+directory. Currently supported:
 
 | Harness      | Install path                                      | Invoke with        |
 |--------------|---------------------------------------------------|--------------------|
@@ -65,16 +66,17 @@ After install, load the skill in your agent and run a phase, e.g.
 ### Manual install (alternative)
 
 If you prefer not to run the script, copy the rendered skill by hand — the
-installer does exactly this:
+installer dereferences the `skills/<harness>/references` symlink so the
+installed directory stays self-contained:
 
 ```bash
 # Hermes
 cp skills/hermes/SKILL.md ~/.hermes/skills/autonomous-ai-agents/autodev/SKILL.md
-cp -r skills/hermes/references   ~/.hermes/skills/autonomous-ai-agents/autodev/
+rsync -aL skills/hermes/references/ ~/.hermes/skills/autonomous-ai-agents/autodev/references/
 
 # Claude Code
 cp skills/claude-code/SKILL.md ~/.claude/skills/autodev/SKILL.md
-cp -r skills/claude-code/references ~/.claude/skills/autodev/
+rsync -aL skills/claude-code/references/ ~/.claude/skills/autodev/references/
 ```
 
 > **That's it.** There is nothing to "run" from a terminal to use AutoDev — you
@@ -91,9 +93,13 @@ across harnesses. The source of truth is:
   how reviewers/executors map to that harness's tools).
 
 `tools/gen.sh` (pure bash, no Python) renders `SKILL.md`,
-`skills/hermes/SKILL.md`, and `skills/claude-code/SKILL.md`, each with a
-self-contained `references/` copy. CI runs `gen.sh` and fails if a committed
-surface ever diverges from the source (`gen-check` job). To rebuild locally:
+`skills/hermes/SKILL.md`, and `skills/claude-code/SKILL.md`, and creates or
+refreshes the per-harness symlinks `skills/<harness>/references ->
+../../references`, idempotently. The repo keeps ONE canonical `references/`
+at the root — the skill dirs carry only the link. CI runs `gen.sh`, checks
+that each symlink exists, points at the right target, and resolves to a
+readable file, and fails if a committed surface ever diverges from the source
+(`gen-check` job). To rebuild locally:
 
 ```bash
 bash tools/gen.sh
@@ -186,7 +192,8 @@ $DEV_NOTES_ROOT/
 │       └── review_aggregator.rs # Optional aggregation + plan generation
 ├── skills/
 │   └── claude-code/SKILL.md    # Claude Code skill surface
-├── references/                 # Integration & pattern guides
+│       └── references -> ../../references  # symlink to canonical refs
+├── references/                 # Canonical integration & pattern guides
 ├── .github/workflows/ci.yml    # CI (Arch Linux)
 ├── Cargo.toml / Cargo.lock
 ├── README.md

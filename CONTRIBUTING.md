@@ -7,13 +7,27 @@ binaries are optional accelerators. Contributions fall into two areas: the skill
 ## Repository layout
 
 ```
-SKILL.md                     # The skill — primary integration artifact
-README.md                    # Install + overview for harness integrators
-references/                  # Integration & pattern guides (this folder)
-skills/claude-code/SKILL.md  # Claude Code skill surface
+SKILL.core.md                # Skill source — edit this, not SKILL.md
+SKILL.md                     # Rendered generic surface (generated)
+references/                  # Canonical integration & pattern guides (single copy at repo root)
+skills/<harness>/references  # Committed SYMLINK -> ../../references (created/refreshed by gen.sh)
+skills/<harness>/SKILL.md    # Per-harness rendered surfaces (generated)
 src/bin/                     # Optional Rust binaries (run-pipeline, etc.)
 tests/                       # Integration tests
 ```
+
+There is ONE canonical `references/` directory at the repo root. Each
+per-harness skill directory carries a committed symlink
+(`skills/<harness>/references -> ../../references`) that `tools/gen.sh`
+creates or refreshes idempotently; `install.sh` dereferences it (`rsync -aL`)
+so installed skill directories remain self-contained.
+
+### Windows note
+
+On Windows without symlink support, a fresh checkout will show
+`skills/<harness>/references` as a plain text file containing
+`../../references` instead of an actual link. Use `git config core.symlinks=true`
+on a system with symlink support (or work in WSL/Linux) to get real links.
 
 ## Contributing to the skill
 

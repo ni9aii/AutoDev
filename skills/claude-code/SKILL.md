@@ -114,7 +114,8 @@ Binaries install to `target/release/`. `cargo install --path .` puts
 │       │   └── phases/{review,aggregate,execute,release,verify}.rs
 │       ├── ci_check.rs         # CI status checker
 │       └── review_aggregator.rs # Review aggregation + plan generation
-├── references/                 # Design patterns and integration guides
+├── references/                 # Design patterns and integration guides (single canonical copy)
+├── skills/<harness>/references # Committed SYMLINK -> ../../references (created by tools/gen.sh)
 ├── .github/workflows/
 │   ├── ci.yml                  # CI (ubuntu + windows matrix)
 │   └── release.yml             # Tag-triggered release with 3 binaries

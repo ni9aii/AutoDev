@@ -8,8 +8,11 @@
 #   ./install.sh --check         # verify install, no changes
 #
 # No Python required. Re-renders the skill from SKILL.core.md + harnesses/*.overlay
-# via tools/gen.sh, then copies the right skills/<h>/SKILL.md (+ references/) into
-# the harness's skill directory.
+# via tools/gen.sh, then copies the right skills/<h>/SKILL.md (+ references/)
+# into the harness's skill directory. In the repo, skills/<h>/references is a
+# SYMLINK to the shared root references/ (see tools/gen.sh); install.sh
+# dereferences it (-aL) so each installed skill dir is self-contained with
+# real files.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -121,10 +124,26 @@ cp -f "$SRC" "$DST/SKILL.md"
 if [ -d "$ROOT/skills/$HARNESS/references" ]; then
   # Mirror, don't accumulate (Fix 7): the installed references/ must exactly
   # equal the source set — rsync --delete removes orphan copies left by
-  # renamed/deleted sources. Files already carry the GENERATED banner from
-  # tools/gen.sh.
+  # renamed/deleted sources.
+  #
+  # Symlink layout: tools/gen.sh makes skills/<h>/references a SYMLINK to
+  # ../../references. Installed skill dirs must be self-contained, so we
+  # dereference with -L: rsync -aL copies the real files the link points at,
+  # not the link itself. (Equivalent to rsync from "$ROOT/references/" since
+  # both per-harness links point there; using the per-harness path keeps the
+  # install driven by what that harness's surface declares.)
   mkdir -p "$DST/references"
-  rsync --delete -a "$ROOT/skills/$HARNESS/references/" "$DST/references/"
+  rsync --delete -aL "$ROOT/skills/$HARNESS/references/" "$DST/references/"
+  # Guard: installed references must be REAL files, never a symlink —
+  # otherwise the install is not self-contained.
+  if [ -L "$DST/references" ]; then
+    echo "ERROR: $DST/references is a symlink; expected dereferenced real files." >&2
+    exit 1
+  fi
+  if ! find "$DST/references" -maxdepth 1 -name '*.md' -type f | grep -q .; then
+    echo "ERROR: $DST/references contains no real .md files." >&2
+    exit 1
+  fi
 fi
 
 echo ""
