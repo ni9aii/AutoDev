@@ -1,3 +1,5 @@
+<!-- GENERATED from references/troubleshooting.md by tools/gen.sh — edit the source, not this copy. -->
+
 # Troubleshooting & FAQ
 
 Common issues when integrating or running AutoDev.

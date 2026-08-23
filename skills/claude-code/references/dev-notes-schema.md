@@ -1,3 +1,5 @@
+<!-- GENERATED from references/dev-notes-schema.md by tools/gen.sh — edit the source, not this copy. -->
+
 # dev-notes Schema
 
 AutoDev stores all intermediate artifacts under a *dev-notes root*. This

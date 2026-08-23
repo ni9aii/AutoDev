@@ -99,11 +99,27 @@ copy_references() {
   [ -d "$REFERENCES" ] || return 0
   # Root skill already lives next to references/ — nothing to copy.
   [ "$(realpath "$dest_ref")" = "$(realpath "$REFERENCES")" ] && return 0
+
+  # Mirror, don't accumulate (Fix 7): plain cp left orphan copies behind when
+  # a source reference was deleted/renamed, and the drift check stayed green
+  # because unchanged orphans produce no diff. rsync --delete makes the copy
+  # exactly equal to the source set.
   mkdir -p "$dest_ref"
+
+  # GENERATED banner: prepend a do-not-edit header to every copied file so
+  # nobody edits a copy and wonders why gen.sh overwrites it.
+  local tmpdir
+  tmpdir="$(mktemp -d)"
   for f in "$REFERENCES"/*.md; do
     [ -e "$f" ] || continue
-    cp -f "$f" "$dest_ref/"
+    {
+      echo "<!-- GENERATED from references/$(basename "$f") by tools/gen.sh — edit the source, not this copy. -->"
+      echo
+      cat "$f"
+    } > "$tmpdir/$(basename "$f")"
   done
+  rsync --delete -a "$tmpdir/" "$dest_ref/"
+  rm -rf "$tmpdir"
 }
 
 [ -f "$CORE" ] || { echo "ERROR: $CORE missing" >&2; exit 1; }

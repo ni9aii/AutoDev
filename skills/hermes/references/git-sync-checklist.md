@@ -1,3 +1,5 @@
+<!-- GENERATED from references/git-sync-checklist.md by tools/gen.sh — edit the source, not this copy. -->
+
 # Git Sync Checklist for Auto-Dev Pipeline
 
 Run before starting any work on a project to avoid mid-session rebase conflicts.
