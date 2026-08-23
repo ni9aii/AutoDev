@@ -1,3 +1,5 @@
+<!-- GENERATED from references/iteration-2-patterns.md by tools/gen.sh — edit the source, not this copy. -->
+
 # AutoDev Patterns — Report Format, Prioritization, Regression Checks
 
 Reference patterns distilled from early pipeline runs. Use these when writing

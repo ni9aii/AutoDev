@@ -1,3 +1,5 @@
+<!-- GENERATED from references/skill-walkthrough.md by tools/gen.sh — edit the source, not this copy. -->
+
 # AutoDev Skill Walkthrough
 
 A phase-by-phase view of what the AutoDev skill does once loaded into your

@@ -1,3 +1,5 @@
+<!-- GENERATED from references/plan-autodev-integration.md by tools/gen.sh — edit the source, not this copy. -->
+
 # Plan ↔ Execute Bridge
 
 This reference explains how AutoDev's aggregation phase output (the

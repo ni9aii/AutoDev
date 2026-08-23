@@ -119,8 +119,12 @@ echo "Installing into: $DST"
 mkdir -p "$DST"
 cp -f "$SRC" "$DST/SKILL.md"
 if [ -d "$ROOT/skills/$HARNESS/references" ]; then
+  # Mirror, don't accumulate (Fix 7): the installed references/ must exactly
+  # equal the source set — rsync --delete removes orphan copies left by
+  # renamed/deleted sources. Files already carry the GENERATED banner from
+  # tools/gen.sh.
   mkdir -p "$DST/references"
-  cp -f "$ROOT/skills/$HARNESS/references"/*.md "$DST/references/" 2>/dev/null || true
+  rsync --delete -a "$ROOT/skills/$HARNESS/references/" "$DST/references/"
 fi
 
 echo ""

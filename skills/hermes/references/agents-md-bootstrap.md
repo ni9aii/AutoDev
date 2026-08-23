@@ -1,3 +1,5 @@
+<!-- GENERATED from references/agents-md-bootstrap.md by tools/gen.sh — edit the source, not this copy. -->
+
 # AGENTS.md Bootstrap Protocol
 
 Every AutoDev target repository gets a project-level `AGENTS.md` (Hermes,

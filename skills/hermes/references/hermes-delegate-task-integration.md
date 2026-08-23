@@ -1,3 +1,5 @@
+<!-- GENERATED from references/hermes-delegate-task-integration.md by tools/gen.sh — edit the source, not this copy. -->
+
 # Hermes `delegate_task` Integration for AutoDev
 
 This guide describes how AutoDev's skill drives Hermes Agent's native

@@ -1,3 +1,5 @@
+<!-- GENERATED from references/json-output.md by tools/gen.sh — edit the source, not this copy. -->
+
 # `run-pipeline --json` Output Contract
 
 When invoked with `--json`, `run-pipeline` emits a single JSON object on

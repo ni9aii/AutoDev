@@ -1,3 +1,5 @@
+<!-- GENERATED from references/rust-conventions.md by tools/gen.sh — edit the source, not this copy. -->
+
 # Rust Conventions — AutoDev Quality Bar
 
 Shared checklist for all AutoDev roles: **reviewers** (what to flag),
