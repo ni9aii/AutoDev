@@ -39,7 +39,7 @@ path = "src/bin/run_pipeline/main.rs"
 
 [[bin]]
 name = "review-aggregator"
-path = "src/bin/review_aggregator.rs"
+path = "src/bin/review_aggregator/main.rs"
 
 [[bin]]
 name = "ci-check"
