@@ -10,7 +10,7 @@ The root is resolved in this order:
 
 1. `--dev-notes-root <path>` (CLI flag)
 2. `DEV_NOTES_ROOT` environment variable
-3. `~/obsidian-vault/dev-notes` (default)
+3. `~/Notes/dev-notes` (default)
 
 ## Directory layout
 

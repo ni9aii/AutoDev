@@ -26,7 +26,7 @@ The aggregator looks for `<dev-notes-root>/<project>/reviews/` and the latest
 **Fix:**
 - Confirm `--project <name>` matches the folder under the dev-notes root.
 - Confirm the reviews were written (Phase 1) before aggregating.
-- Confirm the dev-notes root: default `~/obsidian-vault/dev-notes`, override
+- Confirm the dev-notes root: default `~/Notes/dev-notes`, override
   with `--dev-notes-root` or `DEV_NOTES_ROOT`.
 
 > If reviews are genuinely empty, `review-aggregator` now writes an **empty

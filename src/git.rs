@@ -11,7 +11,7 @@ pub mod paths {
     /// Resolve the dev-notes root directory.
     ///
     /// Precedence: explicit `--dev-notes-root` override > `$DEV_NOTES_ROOT`
-    /// env var > `~/obsidian-vault/dev-notes` default. Shared by all three
+    /// env var > `~/Notes/dev-notes` default. Shared by all three
     /// binaries (`run-pipeline`, `review-aggregator`, `ci-check`) so their
     /// behaviour can't drift.
     pub fn resolve_dev_notes_root(override_path: Option<&PathBuf>) -> Result<PathBuf> {
@@ -22,7 +22,7 @@ pub mod paths {
             return Ok(PathBuf::from(env_root));
         }
         let home = dirs::home_dir().context("Could not determine home directory")?;
-        Ok(home.join("obsidian-vault").join("dev-notes"))
+        Ok(home.join("Notes").join("dev-notes"))
     }
 }
 

@@ -38,7 +38,7 @@ struct Args {
     #[arg(long, default_value = "false")]
     dev_notes: bool,
 
-    /// Root directory for dev-notes (overrides $DEV_NOTES_ROOT and ~/obsidian-vault/dev-notes default)
+    /// Root directory for dev-notes (overrides $DEV_NOTES_ROOT and ~/Notes/dev-notes default)
     #[arg(long)]
     dev_notes_root: Option<PathBuf>,
 }

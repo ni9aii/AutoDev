@@ -187,12 +187,12 @@ user before pushing to main or creating a release.
 | Variable | Required | Purpose |
 |----------|----------|---------|
 | `GITHUB_TOKEN` or `GITHUB_PAT` | For CI check and releases | GitHub API authentication |
-| `DEV_NOTES_ROOT` | Optional | Root for `--dev-notes` paths (default: `~/obsidian-vault/dev-notes`; overridable via `--dev-notes-root`) |
+| `DEV_NOTES_ROOT` | Optional | Root for `--dev-notes` paths (default: `~/Notes/dev-notes`; overridable via `--dev-notes-root`) |
 
 ## dev-notes Integration
 
 When using `--dev-notes` flag, reports are written under `$DEV_NOTES_ROOT`
-(default `~/obsidian-vault/dev-notes`, overridable via `--dev-notes-root`).
+(default `~/Notes/dev-notes`, overridable via `--dev-notes-root`).
 
 **Artifact path contract (single source of truth — reviewers MUST write to
 this exact layout; the aggregator reads it):**

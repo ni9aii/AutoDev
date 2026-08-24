@@ -152,7 +152,7 @@ binary and parses its result programmatically.
 ## dev-notes layout
 
 AutoDev keeps its intermediate artifacts in a dev-notes tree (default
-`~/obsidian-vault/dev-notes`, override via `--dev-notes-root` or the
+`~/Notes/dev-notes`, override via `--dev-notes-root` or the
 `DEV_NOTES_ROOT` env var). This is where the skill writes reviews, plans, and
 CI reports per project:
 
@@ -176,7 +176,7 @@ $DEV_NOTES_ROOT/
 | Variable | Description |
 |----------|-------------|
 | `GITHUB_TOKEN` / `GITHUB_PAT` | GitHub API auth (CI checks, releases) |
-| `DEV_NOTES_ROOT` | Root for dev-notes paths (default: `~/obsidian-vault/dev-notes`) |
+| `DEV_NOTES_ROOT` | Root for dev-notes paths (default: `~/Notes/dev-notes`) |
 
 ## Project structure
 
