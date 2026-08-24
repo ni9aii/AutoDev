@@ -73,4 +73,20 @@ update_block() {
 
 update_block README.md
 update_block SKILL.core.md
-echo "structure blocks updated: README.md SKILL.core.md"
+
+# Refresh the test counter in AGENTS.md (Task 4 of the retro plan): the count
+# between TEST-COUNT markers must match `cargo test -- --list`. CI fails on
+# drift via the same git diff gate as the structure blocks.
+TEST_COUNT="$(cargo test --locked -- --list 2>/dev/null | grep -c ': test')"
+if [ "$TEST_COUNT" -eq 0 ]; then
+  echo "ERROR: could not count tests (cargo test --list returned nothing)" >&2
+  exit 1
+fi
+AGENTS="$ROOT/AGENTS.md"
+if ! grep -q 'TEST-COUNT:BEGIN' "$AGENTS"; then
+  echo "ERROR: $AGENTS has no <!-- TEST-COUNT:BEGIN --> marker" >&2
+  exit 1
+fi
+sed -i "s|<!-- TEST-COUNT:BEGIN -->[0-9]*<!-- TEST-COUNT:END -->|<!-- TEST-COUNT:BEGIN -->${TEST_COUNT}<!-- TEST-COUNT:END -->|" "$AGENTS"
+
+echo "structure blocks updated: README.md SKILL.core.md; test count: $TEST_COUNT"
