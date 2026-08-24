@@ -123,23 +123,42 @@ mod tests {
 
     #[test]
     fn resolve_token_prefers_github_pat() {
-        // Environment variables are process-global; set both and check
-        // PAT wins. (Serial execution assumed — single-threaded test
-        // harness for env-dependent tests.)
-        std::env::set_var("AUTODEV_TEST_PAT", "1");
-        // SAFETY of env mutation in tests: tests in this module that touch
-        // GITHUB_PAT/GITHUB_TOKEN run under cargo's default per-file lock
-        // when placed in one test binary; we avoid asserting exact values
-        // that could race with other bins' tests.
-        std::env::remove_var("GITHUB_PAT");
-        std::env::remove_var("GITHUB_TOKEN");
+        // Environment variables are process-global; tests in this module that
+        // touch GITHUB_PAT/GITHUB_TOKEN run under cargo's default per-file
+        // lock when placed in one test binary. Set BOTH env vars and a gh
+        // response, and assert the documented precedence: PAT wins.
+        std::env::set_var("GITHUB_PAT", "pat-value");
+        std::env::set_var("GITHUB_TOKEN", "tok-value");
         let mock = MockRunner::new();
         mock.push_response(mock_output(true, "tok-from-gh\n", ""));
         let t = resolve_token(&mock).unwrap();
         assert_eq!(
             t.as_deref(),
-            Some("tok-from-gh"),
-            "gh fallback used when env empty"
+            Some("pat-value"),
+            "GITHUB_PAT must win over GITHUB_TOKEN and gh fallback"
+        );
+        // The gh fallback must not even be consulted.
+        assert!(
+            mock.calls.borrow().is_empty(),
+            "gh auth token should not run when GITHUB_PAT is set"
+        );
+    }
+
+    #[test]
+    fn resolve_token_falls_back_to_github_token_before_gh() {
+        std::env::remove_var("GITHUB_PAT");
+        std::env::set_var("GITHUB_TOKEN", "tok-value");
+        let mock = MockRunner::new();
+        mock.push_response(mock_output(true, "tok-from-gh\n", ""));
+        let t = resolve_token(&mock).unwrap();
+        assert_eq!(
+            t.as_deref(),
+            Some("tok-value"),
+            "GITHUB_TOKEN must win over the gh fallback"
+        );
+        assert!(
+            mock.calls.borrow().is_empty(),
+            "gh auth token should not run when GITHUB_TOKEN is set"
         );
     }
 
