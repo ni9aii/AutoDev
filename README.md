@@ -183,21 +183,31 @@ $DEV_NOTES_ROOT/
 ```
 .
 ├── src/
-│   ├── lib.rs                  # Shared modules (log, git, markdown, test_runner)
+│   ├── lib.rs                  # Thin crate root; modules in src/{log,process,
+│   │                           # bin_contract,test_runner,git,validation,
+│   │                           # severity,markdown,github}.rs
 │   └── bin/
-│       ├── run_pipeline/       # Optional pipeline entry point
+│       ├── run_pipeline/       # Pipeline entry point
 │       │   ├── main.rs
-│       │   └── phases/{review,aggregate,execute,release,verify}.rs
-│       ├── ci_check.rs         # Optional CI status checker
-│       └── review_aggregator.rs # Optional aggregation + plan generation
+│       │   ├── phases/{review,aggregate,execute,release,verify}.rs
+│       │   └── pipeline/{build,dispatch,prereqs}.rs
+│       ├── review_aggregator/  # Aggregation + plan generation
+│       │   └── {main,parse,findings,plan}.rs
+│       └── ci_check/           # CI status checker
+│           └── {main,checks,report}.rs
+├── tests/
+│   ├── common/mod.rs           # Shared fixtures (TempDir, FAKE_REVIEW)
+│   ├── aggregator.rs / run_pipeline.rs / release.rs
 ├── skills/
+│   ├── hermes/SKILL.md         # Hermes skill surface
 │   └── claude-code/SKILL.md    # Claude Code skill surface
 │       └── references -> ../../references  # symlink to canonical refs
 ├── references/                 # Canonical integration & pattern guides
-├── .github/workflows/ci.yml    # CI (Arch Linux)
+├── .github/workflows/ci.yml    # CI
 ├── Cargo.toml / Cargo.lock
 ├── README.md
-├── SKILL.md                    # The skill — primary integration artifact
+├── SKILL.core.md + harnesses/  # Skill source (rendered by tools/gen.sh)
+├── SKILL.md                    # Rendered skill — do not edit by hand
 └── CHANGELOG.md
 ```
 
