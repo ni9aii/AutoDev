@@ -22,7 +22,7 @@ never the rendered `SKILL.md` files; keep renders in sync with
 
 ```bash
 cargo build --locked
-cargo test --locked            # 51 tests: lib + 3 bin unittests + integration
+cargo test --locked            # unit + integration suite (lib, 3 bins, per-feature test files)
 cargo clippy --locked -- -D warnings
 cargo fmt --check
 bash tools/gen.sh && git diff --exit-code   # skill drift check
@@ -44,8 +44,8 @@ bash tools/gen.sh && git diff --exit-code   # skill drift check
 - `src/bin/run_pipeline/phases/` and the sibling binary directories
   (`src/bin/review_aggregator/`, `src/bin/ci_check/`) — phase/module
   separation and dispatch patterns: thin `main.rs` plus focused submodules.
-- `tests/integration.rs` — integration test style (tempdir fixtures, assertions
-  on rendered artifacts).
+- `tests/` — per-feature integration tests (`aggregator.rs`, `run_pipeline.rs`,
+  `release.rs` + shared fixtures in `tests/common/mod.rs`).
 
 ## Dogfooding note
 
