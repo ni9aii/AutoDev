@@ -116,8 +116,8 @@ Binaries install to `target/release/`. `cargo install --path .` puts
 ```text
 .
 ├── bin_contract.rs
-├── github.rs
 ├── git.rs
+├── github.rs
 ├── lib.rs
 ├── log.rs
 ├── markdown.rs
@@ -142,8 +142,8 @@ Binaries install to `target/release/`. `cargo install --path .` puts
 ├── run_pipeline.rs
 ├── common/
 │   ├── mod.rs
-├── gen.sh
 ├── gen-structure.sh
+├── gen.sh
 ├── workflows/
 │   ├── ci.yml
 │   ├── release.yml
