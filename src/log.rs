@@ -38,3 +38,18 @@ pub fn error(msg: &str) {
 pub fn success(msg: &str) {
     eprintln!("{} {}", prefix("OK"), msg);
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_log_functions() {
+        set_no_color(true);
+        log("test message");
+        warn("test warning");
+        error("test error");
+        success("test success");
+        set_no_color(false);
+    }
+}

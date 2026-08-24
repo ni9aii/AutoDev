@@ -117,3 +117,51 @@ impl ProcessRunner for MockRunner {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_resolve_exe_finds_known_binary() {
+        // A shell present on the running OS: `sh` on Unix, `cmd.exe` on Windows.
+        #[cfg(unix)]
+        let name = "sh";
+        #[cfg(windows)]
+        let name = "cmd.exe";
+        let resolved = resolve_exe(name).expect("known shell should be on PATH");
+        assert!(resolved.is_absolute());
+        assert!(resolved.is_file());
+    }
+
+    #[test]
+    fn test_resolve_exe_rejects_unknown_binary() {
+        assert!(resolve_exe("definitely-not-a-real-binary-xyz").is_err());
+    }
+
+    #[test]
+    fn test_mock_runner_records_calls_and_replays_responses() {
+        let mock = MockRunner::new();
+        mock.push_response(mock_output(true, "origin-output", ""));
+
+        let output = mock
+            .run("git", &["remote", "get-url", "origin"], None)
+            .unwrap();
+        assert!(output.status.success());
+        assert_eq!(String::from_utf8_lossy(&output.stdout), "origin-output");
+
+        let calls = mock.calls.borrow();
+        assert_eq!(calls.len(), 1);
+        assert_eq!(calls[0].program, "git");
+    }
+
+    #[test]
+    fn test_mock_output_cross_platform_helper() {
+        let o = mock_output(true, "x", "");
+        assert!(o.status.success());
+        assert_eq!(String::from_utf8_lossy(&o.stdout), "x");
+        let e = mock_output(false, "", "boom");
+        assert!(!e.status.success());
+        assert_eq!(String::from_utf8_lossy(&e.stderr), "boom");
+    }
+}

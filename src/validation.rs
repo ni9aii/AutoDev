@@ -55,3 +55,39 @@ pub fn validate_project_name(name: &str) -> Result<(), String> {
     }
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_validate_version_valid() {
+        assert!(validate_version("v0.1.0").is_ok());
+        assert!(validate_version("1.0.0").is_ok());
+        assert!(validate_version("v2.0.0-alpha").is_ok());
+    }
+
+    #[test]
+    fn test_validate_version_invalid() {
+        assert!(validate_version("").is_err());
+        assert!(validate_version("; rm -rf /").is_err());
+        assert!(validate_version("$(whoami)").is_err());
+    }
+
+    #[test]
+    fn test_validate_project_name_blocks_traversal() {
+        // Valid names pass.
+        assert!(validate_project_name("AutoDev").is_ok());
+        assert!(validate_project_name("my-project_1").is_ok());
+
+        // Reject path traversal and separators (Fix 21 from dogfood review).
+        assert!(validate_project_name("../escape").is_err());
+        assert!(validate_project_name("foo/bar").is_err());
+        assert!(validate_project_name("foo\\bar").is_err());
+        assert!(validate_project_name("..\\escape").is_err());
+        assert!(validate_project_name("..").is_err());
+        assert!(validate_project_name(".").is_err());
+        assert!(validate_project_name("").is_err());
+        assert!(validate_project_name("  ").is_err());
+    }
+}

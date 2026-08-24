@@ -37,3 +37,27 @@ impl FromStr for Severity {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_severity_parse_display_order() {
+        assert_eq!("CRITICAL".parse::<Severity>().unwrap(), Severity::Critical);
+        assert_eq!("critical".parse::<Severity>().unwrap(), Severity::Critical);
+        assert_eq!(
+            " Important ".parse::<Severity>().unwrap(),
+            Severity::Important
+        );
+        assert_eq!(Severity::Minor.to_string(), "MINOR");
+        assert!("bogus".parse::<Severity>().is_err());
+        // Ordering: Critical is most severe (sorts first).
+        let mut v = vec![Severity::Minor, Severity::Critical, Severity::Important];
+        v.sort();
+        assert_eq!(
+            v,
+            vec![Severity::Critical, Severity::Important, Severity::Minor]
+        );
+    }
+}

@@ -78,3 +78,32 @@ impl CiCheckRequest {
         a
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_resolve_companion_uses_exe_suffix() {
+        let name = companion_exe_name("review-aggregator");
+        assert!(name.ends_with(std::env::consts::EXE_SUFFIX));
+        assert!(name.starts_with("review-aggregator"));
+        assert_eq!(AGGREGATOR, "review-aggregator");
+        assert_eq!(CI_CHECK, "ci-check");
+    }
+
+    #[test]
+    fn test_aggregate_request_args_roundtrip() {
+        let req = AggregateRequest {
+            input_dir: "/tmp/r".into(),
+            output: "/tmp/p.md".into(),
+            project: Some("proj".into()),
+            dev_notes_root: Some("/dn".into()),
+        };
+        let args = req.to_args();
+        assert_eq!(args[0], "--input-dir");
+        assert_eq!(args[1], "/tmp/r");
+        assert!(args.contains(&"--dev-notes".to_string()));
+        assert!(args.contains(&"--project".to_string()));
+    }
+}

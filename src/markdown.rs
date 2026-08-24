@@ -61,3 +61,71 @@ pub fn safe_truncate(s: &str, max_chars: usize) -> &str {
     }
     &s[..boundary]
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_extract_section_found() {
+        let content = "# Plan\n\n## Do Now\n- Fix 1\n- Fix 2\n\n## Defer\n- Fix 3";
+        let section = extract_section(content, "Do Now");
+        assert!(section.contains("Fix 1"));
+        assert!(section.contains("Fix 2"));
+        assert!(!section.contains("Fix 3"));
+    }
+
+    #[test]
+    fn test_extract_section_not_found() {
+        let content = "# Plan\n\n## Other\n- Something";
+        let section = extract_section(content, "Do Now");
+        assert!(section.is_empty());
+    }
+
+    #[test]
+    fn test_extract_section_any_heading_depth() {
+        let content = "# Plan\n\n### Do Now\n- Fix 1\n\n### Defer\n- Fix 2";
+        let section = extract_section(content, "Do Now");
+        assert!(section.contains("Fix 1"));
+        assert!(!section.contains("Fix 2"));
+    }
+
+    #[test]
+    fn test_extract_section_exact_match_not_substring() {
+        let content = "# Plan\n\n## Don't Do This\n- Fix 1\n\n## Do\n- Fix 2";
+        let section = extract_section(content, "Do");
+        assert!(!section.contains("Fix 1"));
+        assert!(section.contains("Fix 2"));
+    }
+
+    #[test]
+    fn test_extract_section_matches_aggregator_decorated_heading() {
+        // Regression: review-aggregator emits "## 🔴 Do Now (Quick Wins)".
+        // The execute phase calls extract_section(plan, "Do Now"); a strict
+        // whole-heading equality check silently missed this, so execute found
+        // zero fixes on real aggregator output.
+        let content =
+            "# Auto-Dev Fix Plan\n\n## 🔴 Do Now (Quick Wins)\n- Fix A\n- Fix B\n\n## 🟡 Defer\n- Fix C";
+        let section = extract_section(content, "Do Now");
+        assert!(
+            section.contains("Fix A"),
+            "decorated 'Do Now' heading not matched"
+        );
+        assert!(section.contains("Fix B"));
+        assert!(!section.contains("Fix C"), "section bled into Defer");
+    }
+
+    #[test]
+    fn test_safe_truncate_ascii() {
+        assert_eq!(safe_truncate("hello world", 5), "hello");
+    }
+
+    #[test]
+    fn test_safe_truncate_multibyte() {
+        // Russian: each char is 2 bytes
+        let s = "привет";
+        let truncated = safe_truncate(s, 5);
+        assert!(truncated.len() <= 5);
+        assert!(s.starts_with(truncated));
+    }
+}

@@ -79,3 +79,64 @@ fn validate_github_slug(slug: &str) -> Result<()> {
     }
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::process::{mock_output, MockRunner};
+
+    #[test]
+    fn test_get_repo_info_via_mock_runner() {
+        let mock = MockRunner::new();
+        mock.push_response(mock_output(true, "git@github.com:ni9aii/AutoDev.git\n", ""));
+
+        let repo = get_repo_info(std::path::Path::new("."), &mock).unwrap();
+        assert_eq!(repo, "ni9aii/AutoDev");
+    }
+
+    #[test]
+    fn test_get_repo_info_redacts_credentials_in_error() {
+        // Regression (plan finding: credential-bearing remote URL echoed
+        // verbatim): a non-GitHub remote with embedded token must never reach
+        // the error message with the secret intact.
+        let mock = MockRunner::new();
+        mock.push_response(mock_output(
+            true,
+            "https://x-access-token:ghs_secret123@gitlab.example.com/group/repo.git\n",
+            "",
+        ));
+        let err = get_repo_info(std::path::Path::new("."), &mock)
+            .expect_err("non-GitHub remote must fail");
+        let msg = err.to_string();
+        assert!(!msg.contains("ghs_secret123"), "token leaked: {}", msg);
+        assert!(
+            msg.contains("***@gitlab.example.com"),
+            "userinfo not redacted: {}",
+            msg
+        );
+    }
+
+    #[test]
+    fn test_redact_url_variants() {
+        // https + user:pass
+        assert_eq!(
+            redact_url("https://user:pass@example.com/repo.git"),
+            "https://***@example.com/repo.git"
+        );
+        // ssh-style scp syntax has no scheme → nothing matches → unchanged
+        assert_eq!(
+            redact_url("git@github.com:owner/repo.git"),
+            "git@github.com:owner/repo.git"
+        );
+        // ssh:// scheme with userinfo
+        assert_eq!(
+            redact_url("ssh://oauth2:TOKEN@gitlab.com/group/proj.git"),
+            "ssh://***@gitlab.com/group/proj.git"
+        );
+        // no userinfo → unchanged
+        assert_eq!(
+            redact_url("https://github.com/owner/repo.git"),
+            "https://github.com/owner/repo.git"
+        );
+    }
+}
