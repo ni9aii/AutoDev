@@ -14,12 +14,13 @@ jobs:
   build:
     name: Build release binaries (Ubuntu)
     runs-on: ubuntu-latest
+    timeout-minutes: 20
 
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
       - name: Cache cargo registry
-        uses: actions/cache@v6
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
         with:
           path: |
             ~/.cargo/registry
@@ -30,7 +31,7 @@ jobs:
             ${{ runner.os }}-cargo-
 
       - name: Cache target directory
-        uses: actions/cache@v6
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
         with:
           path: target
           key: ${{ runner.os }}-target-release-${{ hashFiles('**/Cargo.lock') }}
@@ -47,15 +48,15 @@ jobs:
       - name: Build release
         run: |
           . $HOME/.cargo/env
-          cargo build --release
+          cargo build --locked --release
 
       - name: Run tests
         run: |
           . $HOME/.cargo/env
-          cargo test --release --verbose
+          cargo test --locked --release --verbose
 
       - name: Attach release binaries
-        uses: softprops/action-gh-release@v3
+        uses: softprops/action-gh-release@c12583777ecdfd3be55c69cf75464299dc01057e # v3
         with:
           files: |
             target/release/run-pipeline

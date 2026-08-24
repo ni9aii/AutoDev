@@ -19,7 +19,7 @@ run-pipeline /path/to/project review --json 2>/dev/null
  "phase": "review",
  "mode": "hermes",
  "timestamp": "20260713_063104",
- "output_dir": "/home/you/obsidian-vault/dev-notes/AutoDev/reviews/20260713_063104"
+ "output_dir": "/home/you/Notes/dev-notes/AutoDev/reviews/20260713_063104"
 }
 ```
 

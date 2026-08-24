@@ -107,13 +107,16 @@ Binaries install to `target/release/`. `cargo install --path .` puts
 ```text
 .
 ├── src/
-│   ├── lib.rs                  # Shared modules: log, git, markdown, test_runner
+│   ├── lib.rs                  # Thin crate root; modules in src/*.rs
 │   └── bin/
 │       ├── run_pipeline/       # Main pipeline entry point
 │       │   ├── main.rs
-│       │   └── phases/{review,aggregate,execute,release,verify}.rs
-│       ├── ci_check.rs         # CI status checker
-│       └── review_aggregator.rs # Review aggregation + plan generation
+│       │   ├── phases/{review,aggregate,execute,release,verify}.rs
+│       │   └── pipeline/{build,dispatch,prereqs}.rs
+│       ├── review_aggregator/  # Review aggregation + plan generation
+│       │   └── {main,parse,findings,plan}.rs
+│       └── ci_check/           # CI status checker
+│           └── {main,checks,report}.rs
 ├── references/                 # Design patterns and integration guides (single canonical copy)
 ├── skills/<harness>/references # Committed SYMLINK -> ../../references (created by tools/gen.sh)
 ├── .github/workflows/
@@ -209,12 +212,12 @@ user before pushing to main or creating a release.
 | Variable | Required | Purpose |
 |----------|----------|---------|
 | `GITHUB_TOKEN` or `GITHUB_PAT` | For CI check and releases | GitHub API authentication |
-| `DEV_NOTES_ROOT` | Optional | Root for `--dev-notes` paths (default: `~/obsidian-vault/dev-notes`; overridable via `--dev-notes-root`) |
+| `DEV_NOTES_ROOT` | Optional | Root for `--dev-notes` paths (default: `~/Notes/dev-notes`; overridable via `--dev-notes-root`) |
 
 ## dev-notes Integration
 
 When using `--dev-notes` flag, reports are written under `$DEV_NOTES_ROOT`
-(default `~/obsidian-vault/dev-notes`, overridable via `--dev-notes-root`).
+(default `~/Notes/dev-notes`, overridable via `--dev-notes-root`).
 
 **Artifact path contract (single source of truth — reviewers MUST write to
 this exact layout; the aggregator reads it):**

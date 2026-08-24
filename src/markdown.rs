@@ -50,16 +50,15 @@ fn heading_matches(heading: &str, target: &str) -> bool {
     normalized == *target || normalized.starts_with(&format!("{} ", target))
 }
 
-/// Truncate string safely at char boundary to avoid UTF-8 panic.
+/// Truncate string safely to at most `max_chars` **characters** (Unicode
+/// scalar values), never splitting a multibyte character.
 pub fn safe_truncate(s: &str, max_chars: usize) -> &str {
-    if s.len() <= max_chars {
+    if s.chars().count() <= max_chars {
         return s;
     }
-    let mut boundary = max_chars;
-    while boundary > 0 && !s.is_char_boundary(boundary) {
-        boundary -= 1;
-    }
-    &s[..boundary]
+    s.char_indices()
+        .nth(max_chars)
+        .map_or(s, |(idx, _)| &s[..idx])
 }
 
 #[cfg(test)]
@@ -121,11 +120,20 @@ mod tests {
     }
 
     #[test]
-    fn test_safe_truncate_multibyte() {
-        // Russian: each char is 2 bytes
-        let s = "привет";
+    fn test_safe_truncate_multibyte_counts_chars() {
+        // Russian: each char is 2 bytes. Truncating to 5 CHARS must yield
+        // exactly 5 characters (10 bytes), not 5 bytes (2.5 chars).
+        let s = "привет мир";
         let truncated = safe_truncate(s, 5);
-        assert!(truncated.len() <= 5);
+        assert_eq!(truncated.chars().count(), 5);
+        assert_eq!(truncated, "приве");
         assert!(s.starts_with(truncated));
+    }
+
+    #[test]
+    fn test_safe_truncate_exact_char_count_returns_whole_string() {
+        let s = "привет";
+        assert_eq!(safe_truncate(s, 6), s);
+        assert_eq!(safe_truncate(s, 7), s);
     }
 }

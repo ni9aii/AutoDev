@@ -7,7 +7,9 @@
 #   ./install.sh --list          # show supported harnesses
 #   ./install.sh --check         # verify install, no changes
 #
-# No Python required. Re-renders the skill from SKILL.core.md + harnesses/*.overlay
+# No Python required. Prerequisites: bash, git, rsync, and a symlink-capable
+# checkout (git core.symlinks=true; on Windows use WSL or enable symlinks).
+# Re-renders the skill from SKILL.core.md + harnesses/*.overlay
 # via tools/gen.sh, then copies the right skills/<h>/SKILL.md (+ references/)
 # into the harness's skill directory. In the repo, skills/<h>/references is a
 # SYMLINK to the shared root references/ (see tools/gen.sh); install.sh
@@ -118,10 +120,32 @@ fi
 echo "Rendering skill surfaces..."
 bash "$GEN"
 
+REFS_SRC="$ROOT/skills/$HARNESS/references"
+# Fail loudly BEFORE any partial install if the references source did not
+# resolve to a directory of .md files. On checkouts without symlink support
+# (e.g. git core.symlinks=false on Windows), skills/<h>/references materializes
+# as a plain TEXT file containing "../../references" — silently skipping it
+# would produce an incomplete skill.
+if [ ! -d "$REFS_SRC" ] || ! ls "$REFS_SRC"/*.md >/dev/null 2>&1; then
+  echo "ERROR: $REFS_SRC did not resolve to a directory of .md files." >&2
+  echo "This usually means your checkout materialized reference symlinks as plain" >&2
+  echo "text files (git core.symlinks=false on Windows). Enable symlink support" >&2
+  echo "(git config --global core.symlinks true + a filesystem that supports links," >&2
+  echo "or WSL) and re-clone/re-checkout, then re-run install." >&2
+  exit 1
+fi
+
+command -v rsync >/dev/null 2>&1 || {
+  echo "ERROR: rsync is required by install.sh but was not found in PATH." >&2
+  echo "Install rsync (on Windows/Git-Bash it is not present by default; use WSL" >&2
+  echo "or install rsync for MSYS2/Git-Bash), then re-run install." >&2
+  exit 1
+}
+
 echo "Installing into: $DST"
 mkdir -p "$DST"
 cp -f "$SRC" "$DST/SKILL.md"
-if [ -d "$ROOT/skills/$HARNESS/references" ]; then
+if [ -d "$REFS_SRC" ]; then
   # Mirror, don't accumulate (Fix 7): the installed references/ must exactly
   # equal the source set — rsync --delete removes orphan copies left by
   # renamed/deleted sources.

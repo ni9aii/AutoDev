@@ -145,5 +145,5 @@ Max iterations should be configurable in the harness (a reasonable default is 5)
 - **`--json` for programmatic use.** `run-pipeline --json` prints a
  machine-readable summary on **stdout** and routes all human log output to
  **stderr**. Parse the JSON when wrapping the binary from your own code.
-- **dev-notes root.** Defaults to `~/obsidian-vault/dev-notes`; override with
+- **dev-notes root.** Defaults to `~/Notes/dev-notes`; override with
  `--dev-notes-root` or the `DEV_NOTES_ROOT` env var.
