@@ -43,4 +43,4 @@ path = "src/bin/review_aggregator/main.rs"
 
 [[bin]]
 name = "ci-check"
-path = "src/bin/ci_check.rs"
+path = "src/bin/ci_check/main.rs"
