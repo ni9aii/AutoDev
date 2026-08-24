@@ -41,6 +41,12 @@ struct Args {
     /// Root directory for dev-notes (overrides $DEV_NOTES_ROOT and ~/Notes/dev-notes default)
     #[arg(long)]
     dev_notes_root: Option<PathBuf>,
+
+    /// Previous plan file whose unresolved "Defer to Next Phase" items are
+    /// carried into the new plan (with an attempt counter). Missing or
+    /// unparseable files are skipped with a warning, not an error.
+    #[arg(long)]
+    carry_over_from: Option<PathBuf>,
 }
 
 fn main() -> Result<()> {
@@ -147,7 +153,7 @@ fn main() -> Result<()> {
     }
 
     // Generate plan
-    generate_plan(&all_findings, &output_path)?;
+    generate_plan(&all_findings, &output_path, args.carry_over_from.as_deref())?;
     println!("Plan generated: {}", output_path.display());
     println!("Total findings: {}", all_findings.len());
 
