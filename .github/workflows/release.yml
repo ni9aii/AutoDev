@@ -14,6 +14,7 @@ jobs:
   build:
     name: Build release binaries (Ubuntu)
     runs-on: ubuntu-latest
+    timeout-minutes: 20
 
     steps:
       - uses: actions/checkout@v7
@@ -47,12 +48,12 @@ jobs:
       - name: Build release
         run: |
           . $HOME/.cargo/env
-          cargo build --release
+          cargo build --locked --release
 
       - name: Run tests
         run: |
           . $HOME/.cargo/env
-          cargo test --release --verbose
+          cargo test --locked --release --verbose
 
       - name: Attach release binaries
         uses: softprops/action-gh-release@v3
