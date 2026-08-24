@@ -59,7 +59,6 @@ pub struct RecordedCall {
     pub cwd: Option<PathBuf>,
 }
 
-/// Build a canned `std::process::Output` for use with `MockRunner`.
 /// Build a fake `Output` with the given success flag and captured streams.
 /// Cross-platform: uses the OS-specific `ExitStatusExt::from_raw` so the
 /// same helper compiles and behaves identically on Unix and Windows.
