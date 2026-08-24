@@ -184,8 +184,8 @@ $DEV_NOTES_ROOT/
 ```text
 .
 ├── bin_contract.rs
-├── github.rs
 ├── git.rs
+├── github.rs
 ├── lib.rs
 ├── log.rs
 ├── markdown.rs
@@ -210,8 +210,8 @@ $DEV_NOTES_ROOT/
 ├── run_pipeline.rs
 ├── common/
 │   ├── mod.rs
-├── gen.sh
 ├── gen-structure.sh
+├── gen.sh
 ├── workflows/
 │   ├── ci.yml
 │   ├── release.yml

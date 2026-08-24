@@ -9,6 +9,9 @@
 # Usage: bash tools/gen-structure.sh
 # Check: git diff --exit-code -- README.md SKILL.core.md
 set -euo pipefail
+# Deterministic sort order across machines/locales (CI caught a drift where
+# gen.sh sorted before/after github.rs depending on the environment's locale).
+export LC_ALL=C
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
