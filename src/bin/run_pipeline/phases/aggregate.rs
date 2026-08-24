@@ -8,15 +8,11 @@ impl Pipeline {
         log::log("=== PHASE 2: AGGREGATE ===");
 
         let plan_path = if self.hermes_mode {
+            // project_name is validated (allowlist) at Pipeline::new time in
+            // all modes, so joining it onto the dev-notes root is safe.
             let project_name = self
                 .project_name
                 .clone()
-                .or_else(|| {
-                    self.project_path
-                        .file_name()
-                        .and_then(|n| n.to_str())
-                        .map(|s| s.to_string())
-                })
                 .unwrap_or_else(|| "unknown".to_string());
             let plans_dir = self.dev_notes_root.join(&project_name).join("plans");
             std::fs::create_dir_all(&plans_dir)?;

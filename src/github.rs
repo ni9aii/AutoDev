@@ -131,8 +131,8 @@ mod tests {
         // GITHUB_PAT/GITHUB_TOKEN run under cargo's default per-file lock
         // when placed in one test binary; we avoid asserting exact values
         // that could race with other bins' tests.
-        let _ = std::env::remove_var("GITHUB_PAT");
-        let _ = std::env::remove_var("GITHUB_TOKEN");
+        std::env::remove_var("GITHUB_PAT");
+        std::env::remove_var("GITHUB_TOKEN");
         let mock = MockRunner::new();
         mock.push_response(mock_output(true, "tok-from-gh\n", ""));
         let t = resolve_token(&mock).unwrap();
@@ -146,8 +146,8 @@ mod tests {
     #[test]
     fn resolve_token_none_when_all_sources_fail() {
         // Neither env var set (best effort) and gh fails.
-        let _ = std::env::remove_var("GITHUB_PAT");
-        let _ = std::env::remove_var("GITHUB_TOKEN");
+        std::env::remove_var("GITHUB_PAT");
+        std::env::remove_var("GITHUB_TOKEN");
         let mock = MockRunner::new();
         mock.push_error("no gh");
         let t = resolve_token(&mock).unwrap();
