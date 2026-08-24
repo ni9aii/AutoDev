@@ -37,8 +37,10 @@ bash tools/gen.sh && git diff --exit-code   # skill drift check
 
 ## Where good code lives
 
-- `src/lib.rs` — module layout, error handling with thiserror/anyhow split,
-  regex Lazy patterns.
+- `src/lib.rs` — thin crate root (module declarations only); each module lives
+  in its own file (`src/log.rs`, `src/process.rs`, `src/git.rs`, ...). Error
+  handling with thiserror/anyhow split, regex Lazy patterns. Module tests live
+  in a `#[cfg(test)] mod tests` block inside the same module file.
 - `src/bin/run_pipeline/phases/` — phase separation and dispatch patterns.
 - `tests/integration.rs` — integration test style (tempdir fixtures, assertions
   on rendered artifacts).
