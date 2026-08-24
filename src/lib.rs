@@ -1,45 +1,4 @@
-pub mod log {
-    use colored::Colorize;
-    use std::sync::atomic::{AtomicBool, Ordering};
-
-    static NO_COLOR: AtomicBool = AtomicBool::new(false);
-
-    /// Disable colored output (respects NO_COLOR env convention).
-    pub fn set_no_color(enabled: bool) {
-        NO_COLOR.store(enabled, Ordering::Relaxed);
-    }
-
-    fn prefix(level: &str) -> String {
-        let no_color = NO_COLOR.load(Ordering::Relaxed);
-        if no_color {
-            format!("[auto-dev] {}", level)
-        } else {
-            match level {
-                "INFO" => format!("{} {}", "[auto-dev]".blue(), "INFO".blue()),
-                "WARN" => format!("{} {}", "[auto-dev]".yellow(), "WARN".yellow()),
-                "ERROR" => format!("{} {}", "[auto-dev]".red(), "ERROR".red()),
-                "OK" => format!("{} {}", "[auto-dev]".green(), "OK".green()),
-                _ => format!("[auto-dev] {}", level),
-            }
-        }
-    }
-
-    pub fn log(msg: &str) {
-        eprintln!("{} {}", prefix("INFO"), msg);
-    }
-
-    pub fn warn(msg: &str) {
-        eprintln!("{} {}", prefix("WARN"), msg);
-    }
-
-    pub fn error(msg: &str) {
-        eprintln!("{} {}", prefix("ERROR"), msg);
-    }
-
-    pub fn success(msg: &str) {
-        eprintln!("{} {}", prefix("OK"), msg);
-    }
-}
+pub mod log;
 
 pub mod process {
     use anyhow::{Context, Result};
@@ -498,47 +457,7 @@ pub mod validation {
     }
 }
 
-pub mod severity {
-    use std::fmt;
-    use std::str::FromStr;
-
-    /// Finding severity, ordered most-severe first (`Critical` < `Important` < `Minor`)
-    /// so that `sort()` places critical findings at the top.
-    #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-    pub enum Severity {
-        Critical,
-        Important,
-        Minor,
-    }
-
-    impl Severity {
-        pub fn as_str(&self) -> &'static str {
-            match self {
-                Severity::Critical => "CRITICAL",
-                Severity::Important => "IMPORTANT",
-                Severity::Minor => "MINOR",
-            }
-        }
-    }
-
-    impl fmt::Display for Severity {
-        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-            f.write_str(self.as_str())
-        }
-    }
-
-    impl FromStr for Severity {
-        type Err = String;
-        fn from_str(s: &str) -> Result<Self, Self::Err> {
-            match s.trim().to_uppercase().as_str() {
-                "CRITICAL" => Ok(Severity::Critical),
-                "IMPORTANT" => Ok(Severity::Important),
-                "MINOR" => Ok(Severity::Minor),
-                other => Err(format!("Unknown severity: {}", other)),
-            }
-        }
-    }
-}
+pub mod severity;
 
 pub mod markdown {
     /// Returns the heading text if `line` is a Markdown heading (any depth 1-6), else None.
