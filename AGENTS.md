@@ -25,7 +25,7 @@ cargo build --locked
 cargo test --locked            # unit + integration suite (lib, 3 bins, per-feature test files)
 cargo clippy --locked -- -D warnings
 cargo fmt --check
-bash tools/gen.sh && git diff --exit-code   # skill drift check
+bash tools/gen.sh && bash tools/gen-structure.sh && git diff --exit-code  # skill + structure drift check
 ```
 
 ## Git conventions
