@@ -41,7 +41,9 @@ bash tools/gen.sh && git diff --exit-code   # skill drift check
   in its own file (`src/log.rs`, `src/process.rs`, `src/git.rs`, ...). Error
   handling with thiserror/anyhow split, regex Lazy patterns. Module tests live
   in a `#[cfg(test)] mod tests` block inside the same module file.
-- `src/bin/run_pipeline/phases/` — phase separation and dispatch patterns.
+- `src/bin/run_pipeline/phases/` and the sibling binary directories
+  (`src/bin/review_aggregator/`, `src/bin/ci_check/`) — phase/module
+  separation and dispatch patterns: thin `main.rs` plus focused submodules.
 - `tests/integration.rs` — integration test style (tempdir fixtures, assertions
   on rendered artifacts).
 
