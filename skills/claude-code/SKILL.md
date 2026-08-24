@@ -213,6 +213,21 @@ review-aggregator \
   --dev-notes-root $DEV_NOTES_ROOT
 ```
 
+To carry unresolved "Defer to Next Phase" items from the previous run into the
+new plan, point `--carry-over-from` at that plan:
+
+```bash
+review-aggregator \
+  --dev-notes \
+  --project <project-name> \
+  --dev-notes-root $DEV_NOTES_ROOT \
+  --carry-over-from $DEV_NOTES_ROOT/<project>/plans/<prev-ts>-plan.md
+```
+
+Carried items appear at the top of the Defer section with an attempt counter;
+items carried 3+ times are flagged "⚠️ WONTFIX candidate — requires human
+decision". A missing or unparseable file is skipped with a warning.
+
 Result: a plan in `$DEV_NOTES_ROOT/<project>/plans/<timestamp>-plan.md` with
 "Do Now" and "Defer" sections.
 

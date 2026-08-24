@@ -136,3 +136,122 @@ fn integration_review_aggregator_missing_reviews_dir_gets_empty_plan() {
         plan.display()
     );
 }
+
+/// A review whose only finding classifies as "defer" (MINOR severity).
+const DEFER_REVIEW: &str = r#"# Code Review Report
+
+### [MINOR] Consider splitting the parser module
+File: `src/parse.rs`
+Description: The parse module mixes tokenizing and AST construction.
+"#;
+
+/// Carry-over end-to-end: run 1 produces plan P1 with a defer item; run 2 with
+/// --carry-over-from P1 must embed that item in P2's defer section marked
+/// attempt 1, under a "Carried over from" provenance header.
+#[test]
+fn integration_review_aggregator_carries_over_deferred_items() {
+    let td = TempDir::new("aggregator-carryover");
+    let project = "carryproj";
+    let plans_dir = td.path.join(project).join("plans");
+
+    // --- Run 1: produce P1 with one deferred finding ---
+    let ts1 = "20260101_000000";
+    let reviews1 = td.path.join(project).join("reviews").join(ts1);
+    fs::create_dir_all(&reviews1).unwrap();
+    fs::write(reviews1.join("code-review.md"), DEFER_REVIEW).unwrap();
+
+    let status = Command::new(env!("CARGO_BIN_EXE_review-aggregator"))
+        .args([
+            "--dev-notes",
+            "--dev-notes-root",
+            td.path.to_str().unwrap(),
+            "--project",
+            project,
+        ])
+        .status()
+        .expect("spawn review-aggregator (run 1)");
+    assert!(status.success(), "run 1 exited non-zero");
+
+    let p1_path = plans_dir.join(format!("{}-plan.md", ts1));
+    let p1 = fs::read_to_string(&p1_path).unwrap();
+    assert!(
+        p1.contains("## 🟡 Defer to Next Phase"),
+        "P1 missing defer section"
+    );
+    assert!(
+        p1.contains("Consider splitting the parser module"),
+        "P1 missing deferred finding"
+    );
+
+    // --- Run 2: a fresh reviews dir + --carry-over-from P1 ---
+    let ts2 = "20260102_000000";
+    let reviews2 = td.path.join(project).join("reviews").join(ts2);
+    fs::create_dir_all(&reviews2).unwrap();
+    fs::write(reviews2.join("code-review.md"), DEFER_REVIEW).unwrap();
+
+    let status = Command::new(env!("CARGO_BIN_EXE_review-aggregator"))
+        .args([
+            "--dev-notes",
+            "--dev-notes-root",
+            td.path.to_str().unwrap(),
+            "--project",
+            project,
+            "--carry-over-from",
+        ])
+        .arg(&p1_path)
+        .status()
+        .expect("spawn review-aggregator (run 2)");
+    assert!(status.success(), "run 2 exited non-zero");
+
+    let p2_path = plans_dir.join(format!("{}-plan.md", ts2));
+    let p2 = fs::read_to_string(&p2_path).unwrap();
+    assert!(
+        p2.contains("> Carried over from "),
+        "P2 missing carried-over header"
+    );
+    assert!(
+        p2.contains("**Carried over:** from "),
+        "P2 carried item missing provenance marker"
+    );
+    assert!(
+        p2.contains(", attempt 1"),
+        "P2 carried item not marked attempt 1"
+    );
+    // Original title/severity/file info is preserved.
+    assert!(
+        p2.contains("Consider splitting the parser module"),
+        "carried item title lost"
+    );
+    assert!(p2.contains("**Severity:** MINOR"));
+    assert!(p2.contains("`src/parse.rs`"));
+    // Carried items come before freshly deferred ones.
+    let carried_pos = p2.find("### Carried 1:").expect("no carried heading");
+    let fresh_pos = p2.find("### Deferred 1:").expect("no fresh defer heading");
+    assert!(
+        carried_pos < fresh_pos,
+        "carried item not at top of defer section"
+    );
+
+    // --- Missing carry-over file: warning, not failure ---
+    let ts3 = "20260103_000000";
+    let reviews3 = td.path.join(project).join("reviews").join(ts3);
+    fs::create_dir_all(&reviews3).unwrap();
+    fs::write(reviews3.join("code-review.md"), DEFER_REVIEW).unwrap();
+
+    let status = Command::new(env!("CARGO_BIN_EXE_review-aggregator"))
+        .args([
+            "--dev-notes",
+            "--dev-notes-root",
+            td.path.to_str().unwrap(),
+            "--project",
+            project,
+            "--carry-over-from",
+            "/nonexistent/plan.md",
+        ])
+        .status()
+        .expect("spawn review-aggregator (run 3)");
+    assert!(
+        status.success(),
+        "missing --carry-over-from file must not fail"
+    );
+}
