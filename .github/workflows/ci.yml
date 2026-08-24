@@ -63,13 +63,14 @@ jobs:
       - name: Build release
         run: cargo build --locked --release
 
-      - name: Audit dependencies
-        # Non-blocking: fails only on a real advisory; `cargo audit` may be
-        # absent on a fresh runner, so don't hard-fail CI on its absence.
-        continue-on-error: true
-        run: |
-          cargo install cargo-audit --locked --force || true
-          cargo audit || true
+      - name: Install cargo-audit
+        # Blocking: hard-fails CI on any known RUSTSEC advisory.
+        uses: taiki-e/install-action@b6ff580856c41316412a0b9b60540fbc6f8c82cc # v2
+        with:
+          tool: cargo-audit
+
+      - name: Run audit
+        run: cargo audit
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v7
