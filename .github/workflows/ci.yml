@@ -92,6 +92,9 @@ jobs:
       - name: Re-render skill surfaces
         run: bash tools/gen.sh
 
+      - name: Regenerate project-structure blocks
+        run: bash tools/gen-structure.sh
+
       - name: Fail if any rendered skill drifted from source
         run: |
           if ! git diff --exit-code -- SKILL.md skills/hermes/SKILL.md skills/claude-code/SKILL.md; then
@@ -99,7 +102,12 @@ jobs:
             echo "Run 'bash tools/gen.sh' locally and commit the result."
             exit 1
           fi
-          echo "Skill surfaces are in sync with source."
+          if ! git diff --exit-code -- README.md SKILL.core.md; then
+            echo "::error::Project-structure blocks drifted from the real tree."
+            echo "Run 'bash tools/gen-structure.sh' locally and commit the result."
+            exit 1
+          fi
+          echo "Skill surfaces and structure blocks are in sync with source."
 
       - name: Functional checks (generator + installer)
         run: |

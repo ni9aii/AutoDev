@@ -180,36 +180,66 @@ $DEV_NOTES_ROOT/
 
 ## Project structure
 
-```
+<!-- STRUCTURE:BEGIN -->
+```text
 .
-├── src/
-│   ├── lib.rs                  # Thin crate root; modules in src/{log,process,
-│   │                           # bin_contract,test_runner,git,validation,
-│   │                           # severity,markdown,github}.rs
-│   └── bin/
-│       ├── run_pipeline/       # Pipeline entry point
-│       │   ├── main.rs
-│       │   ├── phases/{review,aggregate,execute,release,verify}.rs
-│       │   └── pipeline/{build,dispatch,prereqs}.rs
-│       ├── review_aggregator/  # Aggregation + plan generation
-│       │   └── {main,parse,findings,plan}.rs
-│       └── ci_check/           # CI status checker
-│           └── {main,checks,report}.rs
-├── tests/
-│   ├── common/mod.rs           # Shared fixtures (TempDir, FAKE_REVIEW)
-│   ├── aggregator.rs / run_pipeline.rs / release.rs
-├── skills/
-│   ├── hermes/SKILL.md         # Hermes skill surface
-│   └── claude-code/SKILL.md    # Claude Code skill surface
-│       └── references -> ../../references  # symlink to canonical refs
-├── references/                 # Canonical integration & pattern guides
-├── .github/workflows/ci.yml    # CI
-├── Cargo.toml / Cargo.lock
+├── bin_contract.rs
+├── github.rs
+├── git.rs
+├── lib.rs
+├── log.rs
+├── markdown.rs
+├── process.rs
+├── severity.rs
+├── test_runner.rs
+├── validation.rs
+├── bin/
+│   ├── ci_check/
+│   │   ├── checks.rs
+│   │   ├── main.rs
+│   │   ├── report.rs
+│   ├── review_aggregator/
+│   │   ├── findings.rs
+│   │   ├── main.rs
+│   │   ├── parse.rs
+│   │   ├── plan.rs
+│   ├── run_pipeline/
+│   │   ├── main.rs
+├── aggregator.rs
+├── release.rs
+├── run_pipeline.rs
+├── common/
+│   ├── mod.rs
+├── gen.sh
+├── gen-structure.sh
+├── workflows/
+│   ├── ci.yml
+│   ├── release.yml
+├── claude-code/
+│   ├── SKILL.md
+├── hermes/
+│   ├── SKILL.md
+├── claude-code.overlay
+├── generic.overlay
+├── hermes.overlay
+├── agents-md-bootstrap.md
+├── dev-notes-schema.md
+├── git-sync-checklist.md
+├── hermes-delegate-task-integration.md
+├── iteration-2-patterns.md
+├── json-output.md
+├── plan-autodev-integration.md
+├── rust-conventions.md
+├── skill-walkthrough.md
+├── troubleshooting.md
+├── Cargo.toml
+├── SKILL.core.md
 ├── README.md
-├── SKILL.core.md + harnesses/  # Skill source (rendered by tools/gen.sh)
-├── SKILL.md                    # Rendered skill — do not edit by hand
-└── CHANGELOG.md
+├── AGENTS.md
+├── install.sh
+├── renovate.json
 ```
+<!-- STRUCTURE:END -->
 
 ## References
 
