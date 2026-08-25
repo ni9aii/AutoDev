@@ -126,7 +126,7 @@ fn integration_review_aggregator_writes_json_sidecar_matching_markdown() {
     // Item shape and content agreement with the markdown.
     for item in items {
         assert!(
-            item["title"].as_str().unwrap_or("").len() > 0,
+            !item["title"].as_str().unwrap_or("").is_empty(),
             "empty title"
         );
         assert!(item["severity"].is_string(), "severity missing");
