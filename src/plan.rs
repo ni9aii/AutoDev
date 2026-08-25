@@ -41,6 +41,14 @@ pub struct PlanItem {
     pub carried_from: Option<String>,
     #[serde(default)]
     pub attempt: u32,
+    /// True when the aggregator classified this item as Do Now. Part of the
+    /// single-writer invariant (see `review_aggregator::plan::generate_plan`):
+    /// only the aggregator sets it, and it is how consumers recover the Do
+    /// Now slice of the sidecar — positional ordering alone cannot, because
+    /// fresh Defer items are also non-carried. Older sidecars without this
+    /// field deserialize as `false`.
+    #[serde(default)]
+    pub do_now: bool,
 }
 
 /// Machine-readable plan document — the JSON sidecar written next to
@@ -64,6 +72,7 @@ impl PlanItem {
             line: None,
             carried_from: None,
             attempt: 0,
+            do_now: false,
         }
     }
 

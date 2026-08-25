@@ -14,10 +14,16 @@ curl -fsSL https://raw.githubusercontent.com/ni9aii/AutoDev/main/install.sh | ba
 
 `--remote` downloads the release tarball from GitHub, unpacks it to a temp
 directory and runs the bundled installer — full reuse of the local logic.
-If a `<tarball>.sha256` file is published alongside the release tarball, it
-is downloaded and verified with `sha256sum -c` before anything is unpacked;
-a mismatch aborts the install. If no checksum file exists, `--remote`
-prints a warning that the download was **not** verified and continues.
+Verification is done against the `AutoDev-<tag>-sha256.txt` asset published
+with each release (the release workflow builds it from the binaries plus the
+source tarball itself). The installer resolves that asset through the GitHub
+release API, matches its downloaded `<tag>.tar.gz` line and compares digests
+with `sha256sum`; a mismatch aborts the install. If the checksum asset is
+missing (e.g. releases cut before checksum publishing existed), `--remote`
+prints a warning that the download was **not** verified and continues. Note
+that probing for a `<tarball>.sha256` next to a codeload archive URL never
+succeeds — GitHub does not serve such siblings — so the API lookup is what
+makes verification real.
 
 ## From a checkout
 

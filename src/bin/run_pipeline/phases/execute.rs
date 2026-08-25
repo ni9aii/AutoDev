@@ -176,14 +176,20 @@ impl Pipeline {
             ));
             return;
         };
-        // Sidecar carries ALL items (Do Now + Defer + carried); compare only
-        // the non-carried items against what the markdown parser produced.
-        // Matching is by IDENTITY — set equality on (title, file, severity) —
-        // never by position, so a reordered plan still counts as matching
-        // while an extra or missing item always diverges.
+        // SINGLE-WRITER INVARIANT (see review_aggregator::plan::generate_plan):
+        // the aggregator writes plan.md and plan.json together, items ordered
+        // [Do Now..., carried..., fresh Defer...]. The sidecar's Do Now slice
+        // is exactly the items with `do_now == true` — NOT "all non-carried
+        // items", which would wrongly include fresh Defer items and make any
+        // plan with deferrals diverge. Sidecars from before the flag existed
+        // deserialize every item as do_now == false; for those we cannot
+        // recover the slice, so we skip the check instead of false-positive.
         let md_fixes = plan::parse_items(do_now_section);
-        let json_do_now: Vec<&plan::PlanItem> =
-            doc.items.iter().filter(|i| !i.is_carried()).collect();
+        let has_classification = doc.items.iter().any(|i| i.do_now);
+        if !has_classification {
+            return;
+        }
+        let json_do_now: Vec<&plan::PlanItem> = doc.items.iter().filter(|i| i.do_now).collect();
         if !same_do_now_set(&md_fixes, &json_do_now) {
             log::warn(&format!(
                 "DIVERGENCE: plan.md and plan.json disagree on the Do Now set \
@@ -247,7 +253,7 @@ mod tests {
         let pipeline = test_pipeline();
         let dir = std::env::temp_dir().join("ad-div-match");
         let _ = std::fs::create_dir_all(&dir);
-        let json = r#"{"generated":"2026-01-01","items":[{"role":"Code","severity":"CRITICAL","title":"Improve error handling","description":"Errors are swallowed silently.","file":"src/lib.rs","line":null,"carried_from":null,"attempt":0}]}"#;
+        let json = r#"{"generated":"2026-01-01","items":[{"role":"Code","severity":"CRITICAL","title":"Improve error handling","description":"Errors are swallowed silently.","file":"src/lib.rs","line":null,"carried_from":null,"attempt":0,"do_now":true}]}"#;
         let plan = write_plan(&dir, MD_ONE_FIX, Some(json));
         pipeline
             .warn_on_sidecar_divergence(&plan, "## Do Now\n\n### Fix 1: Improve error handling\n");
@@ -258,7 +264,7 @@ mod tests {
         let pipeline = test_pipeline();
         let dir = std::env::temp_dir().join("ad-div-warn");
         let _ = std::fs::create_dir_all(&dir);
-        let json = r#"{"generated":"2026-01-01","items":[{"role":"Code","severity":"CRITICAL","title":"Improve error handling","description":"Errors are swallowed silently.","file":"src/lib.rs","line":null,"carried_from":null,"attempt":0}]}"#;
+        let json = r#"{"generated":"2026-01-01","items":[{"role":"Code","severity":"CRITICAL","title":"Improve error handling","description":"Errors are swallowed silently.","file":"src/lib.rs","line":null,"carried_from":null,"attempt":0,"do_now":true}]}"#;
         let plan = write_plan(&dir, MD_ONE_FIX, Some(json));
         // Markdown now has a SECOND fix the sidecar doesn't know about.
         let edited = format!(
@@ -322,16 +328,46 @@ mod tests {
 
     #[test]
     fn carried_items_are_excluded_before_counting() {
-        // The sidecar stores ALL items; the comparison only sees non-carried
-        // ones, so a carried Defer item must not trigger divergence.
+        // The sidecar stores ALL items; the comparison only sees items with
+        // do_now == true, so carried and fresh Defer items must not trigger
+        // divergence.
         let mut carried = item("old", None, "MINOR");
         carried.carried_from = Some("20250101_000000".to_string());
-        let a = item("A", None, "MINOR");
+        let mut a = item("A", None, "MINOR");
+        a.do_now = true;
+        let fresh_defer = item("later", None, "MINOR"); // do_now == false
         let md = vec![a.clone()];
-        let json: Vec<&PlanItem> = vec![&a, &carried];
-        let non_carried: Vec<&PlanItem> =
-            json.iter().copied().filter(|i| !i.is_carried()).collect();
-        assert!(same_do_now_set(&md, &non_carried));
+        let json: Vec<&PlanItem> = vec![&a, &carried, &fresh_defer];
+        let do_now: Vec<&PlanItem> = json.iter().copied().filter(|i| i.do_now).collect();
+        assert!(same_do_now_set(&md, &do_now));
+    }
+
+    #[test]
+    fn plan_with_fresh_defers_does_not_warn() {
+        // Regression for dogfood cycle 2 Fix 1: fresh Defer items in the
+        // sidecar are non-carried but NOT Do Now — they must not count as
+        // divergence against the markdown Do Now section.
+        let pipeline = test_pipeline();
+        let dir = std::env::temp_dir().join("ad-div-defers");
+        let _ = std::fs::create_dir_all(&dir);
+        let json = r#"{"generated":"2026-01-01","items":[
+            {"role":"Code","severity":"CRITICAL","title":"Improve error handling","description":"Errors are swallowed silently.","file":"src/lib.rs","line":null,"carried_from":null,"attempt":0,"do_now":true},
+            {"role":"Architecture","severity":"MINOR","title":"Refactor module layout","description":"Cross-module redesign.","file":"src/lib.rs","line":42,"carried_from":null,"attempt":0,"do_now":false}]}"#;
+        let plan = write_plan(&dir, MD_ONE_FIX, Some(json));
+        // Must complete without warning; the fresh defer is invisible here.
+        pipeline.warn_on_sidecar_divergence(&plan, MD_ONE_FIX);
+    }
+
+    #[test]
+    fn legacy_sidecar_without_do_now_flags_skips_check() {
+        // Pre-flag sidecars cannot recover their Do Now slice; skip silently
+        // rather than false-positive on "zero Do Now items".
+        let pipeline = test_pipeline();
+        let dir = std::env::temp_dir().join("ad-div-legacy");
+        let _ = std::fs::create_dir_all(&dir);
+        let json = r#"{"generated":"2026-01-01","items":[{"role":"Code","severity":"CRITICAL","title":"Improve error handling","description":"Errors are swallowed silently.","file":"src/lib.rs","line":null,"carried_from":null,"attempt":0}]}"#;
+        let plan = write_plan(&dir, MD_ONE_FIX, Some(json));
+        pipeline.warn_on_sidecar_divergence(&plan, MD_ONE_FIX);
     }
 
     #[test]

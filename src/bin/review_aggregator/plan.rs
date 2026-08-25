@@ -24,6 +24,7 @@ fn finding_to_item(f: &Finding) -> PlanItem {
         line: f.line,
         carried_from: None,
         attempt: 0,
+        do_now: f.classification == Classification::DoNow,
     }
 }
 
@@ -211,6 +212,15 @@ pub(crate) fn generate_plan(
     // markdown. Best-effort for consumers; a serialization failure must not
     // invalidate the human-readable plan, but a write failure is fatal (the
     // sidecar is part of the published artifact set).
+    //
+    // SINGLE-WRITER INVARIANT: this function is the only code that writes
+    // `<ts>-plan.md` and `<ts>-plan.json`, always together, with items in the
+    // order [Do Now..., carried..., fresh Defer...]. Each item carries an
+    // explicit `do_now` flag because position alone cannot recover the Do Now
+    // slice — when no items are carried, fresh Defer items are also
+    // non-carried and indistinguishable by ordering. Consumers (execute phase
+    // divergence check) must select items by `do_now == true`, never by
+    // "all non-carried items".
     let plan_doc = auto_dev_pipeline::plan::Plan {
         generated: now.to_string(),
         items: {
