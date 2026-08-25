@@ -75,3 +75,18 @@ jobs:
             target/release/ci-check
             target/release/review-aggregator
             target/release/AutoDev-*-sha256.txt
+
+      # Producer verifies consumer: right after publishing, run the --remote
+      # installer end-to-end against THIS release (fresh tag), so the one-line
+      # install path is exercised on every real release without relying on
+      # anyone remembering to trigger it manually.
+      - name: Verify one-line remote install of this release
+        if: runner.os == 'Linux'
+        env:
+          AUTODEV_INSTALL_ROOT: /tmp/adremote-e2e
+        run: |
+          git clone --depth 1 "https://github.com/${GITHUB_REPOSITORY}.git" /tmp/autodev-src
+          bash /tmp/autodev-src/install.sh --remote "${GITHUB_REF_NAME}" --harness hermes
+          test -f "$AUTODEV_INSTALL_ROOT/.hermes/skills/autonomous-ai-agents/autodev/SKILL.md"
+          head -1 "$AUTODEV_INSTALL_ROOT/.hermes/skills/autonomous-ai-agents/autodev/SKILL.md" | grep -q -- '---'
+          echo "One-line install of ${GITHUB_REF_NAME} verified."

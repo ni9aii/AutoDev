@@ -14,18 +14,44 @@ impl CiChecker {
 
         log::log(&format!("Checking CI status for: {}", repo));
 
-        // Current branch, so the verdict only considers runs for what is
-        // checked out here (plan finding: the 3 most recent runs across ALL
-        // branches were deciding the verdict).
-        let current_branch = self.current_branch().ok();
-        if let Some(ref branch) = current_branch {
-            log::log(&format!("Filtering workflow runs by branch: {}", branch));
-        } else {
-            log::warn("Could not determine current branch — considering runs from all branches");
-        }
+        // Prefer runs for the checked-out HEAD SHA: stale red runs from
+        // earlier commits on the same branch must not mask a green HEAD
+        // (and vice versa). Fall back to branch filtering when the SHA
+        // cannot be determined.
+        let head_sha = self
+            .runner
+            .run("git", &["rev-parse", "HEAD"], Some(&self.project_path))
+            .ok()
+            .map(|o| String::from_utf8_lossy(&o.stdout).trim().to_string())
+            .filter(|s| !s.is_empty());
 
-        let data: serde_json::Value =
-            auto_dev_pipeline::github::get_workflow_runs(repo, token.as_deref())?;
+        // Branch fallback (used only when the HEAD SHA is unavailable):
+        // restrict the verdict to runs of the checked-out branch.
+        let current_branch = if head_sha.is_none() {
+            self.current_branch().ok()
+        } else {
+            None
+        };
+
+        let data: serde_json::Value = if let Some(ref sha) = head_sha {
+            log::log(&format!(
+                "Filtering workflow runs by HEAD commit: {}",
+                &sha[..sha.len().min(12)]
+            ));
+            auto_dev_pipeline::github::get_workflow_runs_for_sha(repo, sha, token.as_deref())?
+        } else {
+            // Current branch, so the verdict only considers runs for what is
+            // checked out here (plan finding: the 3 most recent runs across ALL
+            // branches were deciding the verdict).
+            if let Some(ref branch) = current_branch {
+                log::log(&format!("Filtering workflow runs by branch: {}", branch));
+            } else {
+                log::warn(
+                    "Could not determine current branch — considering runs from all branches",
+                );
+            }
+            auto_dev_pipeline::github::get_workflow_runs(repo, token.as_deref())?
+        };
 
         let total_count = data
             .get("total_count")
@@ -53,12 +79,15 @@ impl CiChecker {
                 .and_then(|v| v.as_str())
                 .unwrap_or("unknown");
 
-            // Only the checked-out branch decides the verdict; unrelated
-            // feature-branch failures must not fail us (and vice versa mask
-            // our own red run).
-            if let Some(ref current) = current_branch {
-                if branch != current.as_str() {
-                    continue;
+            // SHA-filtered runs are already scoped to our commit; in the
+            // branch-filter fallback, only the checked-out branch decides
+            // the verdict (unrelated feature-branch failures must not fail
+            // us — and vice versa mask our own red run).
+            if head_sha.is_none() {
+                if let Some(ref current) = current_branch {
+                    if branch != current.as_str() {
+                        continue;
+                    }
                 }
             }
 
