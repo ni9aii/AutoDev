@@ -3,6 +3,15 @@
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 
+/// Triage decision for a finding (Task 5: typed, was a free-form String).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub(crate) enum Classification {
+    #[serde(rename = "do_now")]
+    DoNow,
+    #[serde(rename = "defer")]
+    Defer,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub(crate) struct Finding {
     pub(crate) role: String,
@@ -11,10 +20,14 @@ pub(crate) struct Finding {
     pub(crate) description: String,
     pub(crate) file: Option<String>,
     pub(crate) line: Option<usize>,
-    pub(crate) classification: String, // "do_now" or "defer"
+    pub(crate) classification: Classification,
 }
 
-pub(crate) fn classify_finding(severity: &str, file: &Option<String>, body: &str) -> String {
+pub(crate) fn classify_finding(
+    severity: &str,
+    file: &Option<String>,
+    body: &str,
+) -> Classification {
     use auto_dev_pipeline::severity::Severity;
     let is_critical = matches!(
         severity.parse::<Severity>(),
@@ -27,9 +40,9 @@ pub(crate) fn classify_finding(severity: &str, file: &Option<String>, body: &str
         && !body.contains("redesign");
 
     if is_critical && has_file && is_simple {
-        "do_now".to_string()
+        Classification::DoNow
     } else {
-        "defer".to_string()
+        Classification::Defer
     }
 }
 
@@ -74,7 +87,7 @@ mod tests {
             description: String::new(),
             file: file.map(|f| f.to_string()),
             line: None,
-            classification: "do_now".to_string(),
+            classification: Classification::DoNow,
         }
     }
 

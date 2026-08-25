@@ -132,20 +132,9 @@ impl Pipeline {
 mod tests {
     use super::*;
     use auto_dev_pipeline::process::SystemRunner;
-    use std::path::PathBuf as StdPathBuf;
 
     fn test_pipeline() -> Pipeline {
-        Pipeline {
-            project_path: StdPathBuf::from("."),
-            phase: crate::Phase::Full,
-            version: None,
-            project_name: None,
-            timestamp: "20260101_000000".to_string(),
-            output_dir: StdPathBuf::from("."),
-            dev_notes_root: StdPathBuf::from("."),
-            json: false,
-            runner: Box::new(SystemRunner),
-        }
+        Pipeline::test_default(Box::new(SystemRunner))
     }
 
     #[test]

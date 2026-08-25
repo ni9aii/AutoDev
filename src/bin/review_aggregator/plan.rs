@@ -11,7 +11,7 @@ use std::path::Path;
 use auto_dev_pipeline::markdown;
 use auto_dev_pipeline::plan::{self, PlanItem};
 
-use super::findings::{prioritize_findings, Finding};
+use super::findings::{prioritize_findings, Classification, Finding};
 
 /// Convert a parsed finding into a plan item.
 fn finding_to_item(f: &Finding) -> PlanItem {
@@ -142,7 +142,7 @@ pub(crate) fn generate_plan(
     // Do Now section
     let do_now: Vec<_> = prioritized
         .iter()
-        .filter(|f| f.classification == "do_now")
+        .filter(|f| f.classification == Classification::DoNow)
         .collect();
     if !do_now.is_empty() {
         lines.push("## 🔴 Do Now (Quick Wins)".to_string());
@@ -161,7 +161,7 @@ pub(crate) fn generate_plan(
     // Defer section
     let defer: Vec<_> = prioritized
         .iter()
-        .filter(|f| f.classification == "defer")
+        .filter(|f| f.classification == Classification::Defer)
         .collect();
     let has_carried = carried.as_ref().is_some_and(|c| !c.is_empty());
     if !defer.is_empty() || has_carried {
