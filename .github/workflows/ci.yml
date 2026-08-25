@@ -152,4 +152,19 @@ jobs:
           if ./install.sh --harness nope --check > /tmp/in.txt 2>&1; then
             echo "::error::unknown harness should fail"; exit 1
           fi
+          echo "== version stamp + uninstall + update flags =="
+          grep -q '^# AUTODEV_SKILL_VERSION' /tmp/adtest/.claude/skills/autodev/.autodev-version || { echo "::error::version stamp missing after install"; exit 1; }
+          AUTODEV_INSTALL_ROOT=/tmp/adtest ./install.sh --harness claude-code --uninstall > /tmp/iu.txt 2>&1
+          AUTODEV_INSTALL_ROOT=/tmp/adtest ./install.sh --harness claude-code --check > /tmp/ic3.txt 2>&1 && rc=0 || rc=$?
+          test "$rc" -eq 1 || { echo "::error::--check should exit 1 after uninstall, got $rc"; exit 1; }
+          echo "== remote install: real end-to-end from the latest release tag =="
+          # Downloads the public release tarball and installs into a temp root.
+          # Needs network; runs on ubuntu-latest runners like the rest of CI.
+          rm -rf /tmp/adremote
+          AUTODEV_INSTALL_ROOT=/tmp/adremote bash ./install.sh --remote --harness hermes > /tmp/iremote.txt 2>&1 \
+            || { echo "::error::remote install failed"; cat /tmp/iremote.txt; exit 1; }
+          test -f /tmp/adremote/.hermes/skills/autonomous-ai-agents/autodev/SKILL.md \
+            || { echo "::error::remote install produced no SKILL.md"; exit 1; }
+          head -1 /tmp/adremote/.hermes/skills/autonomous-ai-agents/autodev/SKILL.md | grep -q '---' \
+            || { echo "::error::installed SKILL.md is not a skill file"; exit 1; }
           echo "All generator + installer checks passed."
