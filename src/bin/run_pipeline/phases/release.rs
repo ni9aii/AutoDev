@@ -4,11 +4,18 @@ use auto_dev_pipeline::{git, log};
 
 /// Read the `[package] version` from a Cargo.toml string without pulling in
 /// a TOML parser: scan lines, tracking whether we are inside `[package]`.
-/// Returns None when absent or malformed.
+/// Everything after a `#` on a line is stripped first (TOML comments), so
+/// `version = "1.2.3" # bumped` parses correctly instead of poisoning the
+/// extracted value with the trailing comment text. Returns None when absent
+/// or malformed.
 fn cargo_package_version(cargo_toml: &str) -> Option<String> {
     let mut in_package = false;
     for line in cargo_toml.lines() {
-        let trimmed = line.trim();
+        // Strip TOML comments: everything from the first '#' onward. A '#'
+        // inside a quoted value would be truncated too, but semver values
+        // never contain '#' and this is intentionally minimal.
+        let no_comment = line.split('#').next().unwrap_or(line);
+        let trimmed = no_comment.trim();
         if trimmed.starts_with('[') {
             in_package = trimmed == "[package]";
             continue;
@@ -517,5 +524,24 @@ mod tests {
             None
         );
         assert_eq!(super::cargo_package_version(""), None);
+    }
+
+    #[test]
+    fn test_cargo_package_version_strips_inline_comment() {
+        // Fix 4 regression: a hand-edited Cargo.toml with a trailing comment
+        // must yield the clean version, not "1.2.3\" # release".
+        let toml = "[package]\nname = \"x\"\nversion = \"1.2.3\" # release cut\n";
+        assert_eq!(super::cargo_package_version(toml).as_deref(), Some("1.2.3"));
+        // Full-line comments and commented-out duplicates are ignored.
+        let toml2 = concat!(
+            "# workspace root\n",
+            "[package]\n",
+            "# version = \"9.9.9\"\n",
+            "version = \"2.0.0\"\n"
+        );
+        assert_eq!(
+            super::cargo_package_version(toml2).as_deref(),
+            Some("2.0.0")
+        );
     }
 }

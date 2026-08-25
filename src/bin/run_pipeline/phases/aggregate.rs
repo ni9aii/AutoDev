@@ -36,7 +36,8 @@ impl Pipeline {
                 .project_name
                 .clone()
                 .unwrap_or_else(|| "unknown".to_string());
-            let plans_dir = self.dev_notes_root.join(&project_name).join("plans");
+            let plans_dir =
+                auto_dev_pipeline::devnotes::paths(&self.dev_notes_root, &project_name).plans;
             std::fs::create_dir_all(&plans_dir)?;
             plans_dir.join(format!("{}-plan.md", self.timestamp))
         };

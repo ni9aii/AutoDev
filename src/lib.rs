@@ -19,3 +19,5 @@ pub mod markdown;
 pub mod plan;
 
 pub mod github;
+
+pub mod devnotes;
