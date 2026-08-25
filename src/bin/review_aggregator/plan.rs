@@ -3,7 +3,7 @@
 //! Rendering and parsing both go through the shared typed model
 //! (`auto_dev_pipeline::plan`) — one producer, one consumer (Task 1).
 
-use anyhow::Result;
+use anyhow::{Context, Result};
 use std::collections::HashMap;
 use std::fs;
 use std::path::Path;
@@ -206,6 +206,28 @@ pub(crate) fn generate_plan(
 
     // Write output
     fs::write(output_path, lines.join("\n"))?;
+
+    // JSON sidecar (Task 2): machine-readable mirror of the plan next to the
+    // markdown. Best-effort for consumers; a serialization failure must not
+    // invalidate the human-readable plan, but a write failure is fatal (the
+    // sidecar is part of the published artifact set).
+    let plan_doc = auto_dev_pipeline::plan::Plan {
+        generated: now.to_string(),
+        items: {
+            let mut items: Vec<PlanItem> = do_now.iter().map(|f| finding_to_item(f)).collect();
+            if let Some(carried_items) = &carried {
+                items.extend(carried_items.iter().cloned());
+            }
+            items.extend(defer.iter().map(|f| finding_to_item(f)));
+            items
+        },
+    };
+    let sidecar_path = output_path.with_extension("json");
+    fs::write(
+        &sidecar_path,
+        serde_json::to_string_pretty(&plan_doc).context("serialize plan JSON sidecar")?,
+    )?;
+    auto_dev_pipeline::log::log(&format!("Plan sidecar written: {}", sidecar_path.display()));
     Ok(())
 }
 
