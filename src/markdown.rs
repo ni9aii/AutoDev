@@ -45,6 +45,44 @@ pub fn extract_section(content: &str, section_name: &str) -> String {
     result.join("\n")
 }
 
+/// Extract the CHANGELOG.md section for `version`: from the
+/// `## [<version>]` heading up to the next `##` heading or EOF. Returns
+/// `None` when no section with exactly that version exists — the release
+/// phase gates on this so a release body is always curated, never
+/// auto-generated.
+pub fn extract_changelog_section(content: &str, version: &str) -> Option<String> {
+    let header_prefix = format!("## [{}]", version);
+    let mut result: Vec<&str> = Vec::new();
+    let mut in_section = false;
+    for line in content.lines() {
+        let trimmed = line.trim_end();
+        if trimmed.starts_with("## ") {
+            if in_section {
+                break;
+            }
+            if trimmed.starts_with(&header_prefix) {
+                // Exact bracket match only: "[1.2.3]" must not match
+                // "[1.2.30]". The prefix already ends at the closing
+                // bracket, so what follows must be whitespace or nothing
+                // (a date suffix like " - 2026-08-25" is fine).
+                let after = &trimmed[header_prefix.len()..];
+                if after.is_empty() || after.starts_with(char::is_whitespace) {
+                    in_section = true;
+                    result.push(trimmed);
+                }
+            }
+            continue;
+        }
+        if in_section {
+            result.push(trimmed);
+        }
+    }
+    if !in_section {
+        return None;
+    }
+    Some(result.join("\n").trim().to_string())
+}
+
 /// Does a Markdown heading identify the requested section?
 ///
 /// Matching is tolerant of leading decoration (emoji/symbols the aggregator
@@ -75,6 +113,37 @@ pub fn safe_truncate(s: &str, max_chars: usize) -> &str {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_extract_changelog_section_found_with_date_suffix() {
+        let content = "# Changelog\n\n## [Unreleased]\n\n- wip\n\n## [1.2.3] - 2026-08-25\n\n### Added\n- thing\n\n## [1.2.2] - 2026-08-01\n\n- old\n";
+        let sec = extract_changelog_section(content, "1.2.3").unwrap();
+        assert!(sec.starts_with("## [1.2.3]"));
+        assert!(sec.contains("### Added"));
+        assert!(sec.contains("- thing"));
+        assert!(!sec.contains("old"), "must stop at the next ## heading");
+        assert!(!sec.contains("wip"), "must not leak other sections");
+    }
+
+    #[test]
+    fn test_extract_changelog_section_runs_to_eof() {
+        let content = "## [0.9.0]\n\n- last section";
+        let sec = extract_changelog_section(content, "0.9.0").unwrap();
+        assert_eq!(sec, "## [0.9.0]\n\n- last section");
+    }
+
+    #[test]
+    fn test_extract_changelog_section_missing_returns_none() {
+        let content = "## [1.2.3] - 2026-08-25\n\n- thing\n";
+        assert!(extract_changelog_section(content, "9.9.9").is_none());
+    }
+
+    #[test]
+    fn test_extract_changelog_section_exact_version_no_prefix_match() {
+        // "[1.2.3]" must not match "[1.2.30]".
+        let content = "## [1.2.30] - date\n\n- wrong\n";
+        assert!(extract_changelog_section(content, "1.2.3").is_none());
+    }
 
     #[test]
     fn test_extract_section_keeps_deeper_headings_inside_section() {

@@ -9,6 +9,59 @@
 use anyhow::{Context, Result};
 use serde_json::Value;
 
+/// Minimal blocking-HTTP abstraction over the two GitHub API verbs this
+/// crate needs (POST JSON, GET JSON), so phase logic that calls the GitHub
+/// API can be unit-tested with a mock client instead of hitting
+/// api.github.com — the same hermetic pattern `ProcessRunner`/`MockRunner`
+/// gives subprocess calls.
+pub trait HttpClient {
+    /// POST a JSON payload with bearer auth; return `(status_code, body)`.
+    /// Callers decide error policy (the release phase treats a non-success
+    /// after a pushed tag as fatal).
+    fn post_json(&self, url: &str, token: &str, payload: &Value) -> Result<(u16, String)>;
+
+    /// GET JSON (optionally authenticated); non-success statuses are errors
+    /// carrying the status code and the API's `message` field when present.
+    fn get_json(&self, url: &str, token: Option<&str>) -> Result<Value>;
+}
+
+/// Production [`HttpClient`] backed by the shared reqwest client.
+pub struct ReqwestHttpClient;
+
+impl HttpClient for ReqwestHttpClient {
+    fn post_json(&self, url: &str, token: &str, payload: &Value) -> Result<(u16, String)> {
+        let url = url::Url::parse(url).context("Failed to build GitHub API URL")?;
+        let response = base_request(client()?.post(url), Some(token))
+            .json(payload)
+            .send()
+            .context("Failed to call GitHub API")?;
+        let status = response.status();
+        let text = response.text().unwrap_or_default();
+        Ok((status.as_u16(), text))
+    }
+
+    fn get_json(&self, url: &str, token: Option<&str>) -> Result<Value> {
+        let url = url::Url::parse(url).context("Failed to build GitHub API URL")?;
+        let response = base_request(client()?.get(url), token)
+            .send()
+            .context("Failed to call GitHub API")?;
+
+        let status = response.status();
+        if !status.is_success() {
+            let body: Value = response.json().unwrap_or_default();
+            let msg = body
+                .get("message")
+                .and_then(|v| v.as_str())
+                .unwrap_or("Unknown error");
+            anyhow::bail!("GitHub API error ({}): {}", status, msg);
+        }
+
+        response
+            .json()
+            .context("Failed to parse GitHub API response")
+    }
+}
+
 /// Token resolution precedence, documented once:
 /// 1. `GITHUB_PAT` (explicit personal token)
 /// 2. `GITHUB_TOKEN` (CI-provided / general token)
@@ -67,23 +120,36 @@ fn base_request(
 /// in ci-check.
 pub fn get_workflow_runs(repo: &str, token: Option<&str>) -> Result<Value> {
     let url = api_url(repo, "actions/runs?per_page=15")?;
-    let response = base_request(client()?.get(url), token)
-        .send()
-        .context("Failed to call GitHub API")?;
+    ReqwestHttpClient.get_json(url.as_str(), token)
+}
 
-    let status = response.status();
-    if !status.is_success() {
-        let body: Value = response.json().unwrap_or_default();
-        let msg = body
-            .get("message")
-            .and_then(|v| v.as_str())
-            .unwrap_or("Unknown error");
-        anyhow::bail!("GitHub API error ({}): {}", status, msg);
-    }
-
-    response
-        .json()
-        .context("Failed to parse GitHub API response")
+/// Is GitHub Actions green for `sha`?
+///
+/// Fetches workflow runs for the HEAD SHA and requires at least one run with
+/// every conclusion equal to `"success"`. A missing or empty run set is NOT
+/// success (releasing untested code must not look safe).
+pub fn head_ci_success(
+    repo: &str,
+    sha: &str,
+    token: &str,
+    http: &dyn HttpClient,
+) -> Result<Vec<String>> {
+    let url = api_url(repo, &format!("actions/runs?head_sha={}&per_page=100", sha))?;
+    let runs = http
+        .get_json(url.as_str(), Some(token))?
+        .get("workflow_runs")
+        .and_then(|v| v.as_array())
+        .cloned()
+        .unwrap_or_default();
+    Ok(runs
+        .iter()
+        .map(|r| {
+            r.get("conclusion")
+                .and_then(|c| c.as_str())
+                .unwrap_or("unknown")
+                .to_string()
+        })
+        .collect())
 }
 
 /// POST /repos/{repo}/releases — create a GitHub Release for a validated
@@ -96,7 +162,8 @@ pub fn create_release(
     name: &str,
     body: &str,
     token: &str,
-) -> Result<(reqwest::StatusCode, String)> {
+    http: &dyn HttpClient,
+) -> Result<(u16, String)> {
     // serde_json instead of string interpolation: JSON correctness must
     // not depend on a distant validation regex (Deferred-10/15/26).
     let payload = serde_json::json!({
@@ -107,13 +174,7 @@ pub fn create_release(
         "prerelease": false,
     });
     let url = api_url(repo, "releases")?;
-    let response = base_request(client()?.post(url), Some(token))
-        .json(&payload)
-        .send()
-        .context("Failed to create GitHub release")?;
-    let status = response.status();
-    let text = response.text().unwrap_or_default();
-    Ok((status, text))
+    http.post_json(url.as_str(), token, &payload)
 }
 
 #[cfg(test)]

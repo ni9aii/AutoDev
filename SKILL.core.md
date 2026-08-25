@@ -77,7 +77,9 @@ run-pipeline /path/to/project review --project myproject
 # Review + plan
 run-pipeline /path/to/project plan --project myproject
 
-# Release
+# Release (pre-flight: clean tree, branch main, CI green on HEAD,
+# Cargo.toml version == tag; CHANGELOG.md must contain a `## [X.Y.Z]`
+  section — its text becomes the GitHub Release body)
 run-pipeline /path/to/project release --release-version v0.6.0
 ```
 

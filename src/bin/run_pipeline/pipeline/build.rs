@@ -37,6 +37,9 @@ pub(crate) struct Pipeline {
     pub(crate) dev_notes_root: PathBuf,
     pub(crate) json: bool,
     pub(crate) runner: Box<dyn ProcessRunner>,
+    /// GitHub API client (production reqwest wrapper; mocked in tests so the
+    /// release phase never touches the network under test).
+    pub(crate) http: Box<dyn auto_dev_pipeline::github::HttpClient>,
 }
 
 impl Pipeline {
@@ -74,6 +77,7 @@ impl Pipeline {
             dev_notes_root,
             json: args.json,
             runner: Box::new(SystemRunner),
+            http: Box::new(auto_dev_pipeline::github::ReqwestHttpClient),
         })
     }
 }
@@ -93,6 +97,7 @@ impl Pipeline {
             dev_notes_root: std::path::PathBuf::from("."),
             json: false,
             runner,
+            http: Box::new(auto_dev_pipeline::github::ReqwestHttpClient),
         }
     }
 }
