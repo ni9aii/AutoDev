@@ -1,8 +1,25 @@
 # Changelog
 
-## [Unreleased]
+## [0.9.0] - 2026-08-25
 
 ### Added
+- One-line remote install: `curl -fsSL https://raw.githubusercontent.com/ni9aii/AutoDev/main/install.sh | bash -s -- --remote`
+  downloads a release tarball, verifies its SHA-256 against the published
+  `AutoDev-<tag>-sha256.txt` release asset (loud warning when absent) and runs
+  the bundled installer — no checkout needed (#52). Installer also gains
+  `--update`, `--uninstall`, and a `.autodev-version` stamp in the installed
+  skill dir; CI covers the installer round-trip and gates a real end-to-end
+  remote install to `workflow_dispatch`.
+- Execute resume phase: `run-pipeline --phase execute` re-runs only execution
+  against an existing run's artifacts (`AUTO_DEV_TIMESTAMP`), failing fast
+  with an actionable message when no plan exists (#53). Timestamp format is
+  validated before path use.
+- Markdown→JSON migration step 1: execute-phase divergence check warns loudly
+  when `plan.md` and `plan.json` disagree on the Do Now set. Sidecar items
+  carry an explicit `do_now` flag so the comparison selects the right slice;
+  identity-based matching ignores reorders and catches extra/missing items.
+  Data from real cycles decides whether markdown fallback parsers can be
+  removed in 0.10 (#53, #58).
 - Release phase is now a real release tool: pre-flight checks before any side
   effect (clean working tree, branch `main`, HEAD's GitHub Actions CI success,
   Cargo.toml version == tag), a changelog gate (a curated `## [X.Y.Z]` section
@@ -11,15 +28,21 @@
   `github::HttpClient` trait (`ReqwestHttpClient` in production, mock in
   tests) — the happy path build→tag→push→release is now covered without
   network access.
-- `run-pipeline --phase execute`: resume/re-run only the execute phase against
-  an existing review timestamp directory (pin the run with
-  `AUTO_DEV_TIMESTAMP`); fails fast with an actionable message when no plan
-  file exists for that timestamp.
-- Execute-phase divergence check (markdown→JSON migration, step 1): when the
-  `plan.json` sidecar exists but disagrees with the parsed `plan.md` Do Now
-  set (e.g. after a manual markdown edit), a loud warning is emitted. Data
-  collected here decides whether the markdown fallback parsers can be removed
-  in 0.10. Best-effort: missing/invalid sidecar stays silent.
+- Docs restructure: README slimmed to a selling quickstart (261 → 105 lines)
+  with the one-line install up top; details moved to `docs/` — how-it-works,
+  installation, dev-notes layout, configuration, project structure (generated
+  block retargeted with CI drift check), development-by-cycles, and a
+  new-harness recipe (#55).
+- Release docs honesty: skill surfaces and docs state Linux-only release
+  binaries instead of implying Windows coverage (#57).
+
+### Changed
+- Reviewers must follow the `references/dev-notes-schema.md` finding format —
+  stated explicitly in the skill after dogfood showed prose reports yield an
+  empty plan (#56).
+- Dev-notes path construction centralized in `auto_dev_pipeline::devnotes`;
+  sidecar divergence uses identity comparison with count check; Cargo.toml
+  version parsing strips inline comments (#57).
 
 ## [0.8.0] - 2026-08-25
 
