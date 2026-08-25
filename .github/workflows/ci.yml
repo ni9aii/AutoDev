@@ -5,6 +5,11 @@ on:
     branches: [main, develop]
   pull_request:
     branches: [main]
+  # workflow_dispatch additionally runs the --remote end-to-end installer
+  # check (job `remote-e2e`), which downloads a real release tarball. It is
+  # NOT part of the PR path: PRs must not depend on the last published
+  # release, which may predate the PR's own installer changes.
+  workflow_dispatch:
 
 # Least-privilege: the test job only needs to read contents to check out.
 permissions:
@@ -157,9 +162,24 @@ jobs:
           AUTODEV_INSTALL_ROOT=/tmp/adtest ./install.sh --harness claude-code --uninstall > /tmp/iu.txt 2>&1
           AUTODEV_INSTALL_ROOT=/tmp/adtest ./install.sh --harness claude-code --check > /tmp/ic3.txt 2>&1 && rc=0 || rc=$?
           test "$rc" -eq 1 || { echo "::error::--check should exit 1 after uninstall, got $rc"; exit 1; }
-          echo "== remote install: real end-to-end from the latest release tag =="
-          # Downloads the public release tarball and installs into a temp root.
-          # Needs network; runs on ubuntu-latest runners like the rest of CI.
+          # The --remote end-to-end check lives in the separate `remote-e2e`
+          # job below (workflow_dispatch only): PR CI must not depend on the
+          # last published release.
+          echo "All generator + installer checks passed."
+
+  remote-e2e:
+    name: Remote installer end-to-end (latest release)
+    needs: gen-check
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    if: github.event_name == 'workflow_dispatch'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Install from the latest published release tarball
+        run: |
+          set -eu
           rm -rf /tmp/adremote
           AUTODEV_INSTALL_ROOT=/tmp/adremote bash ./install.sh --remote --harness hermes > /tmp/iremote.txt 2>&1 \
             || { echo "::error::remote install failed"; cat /tmp/iremote.txt; exit 1; }
@@ -167,4 +187,4 @@ jobs:
             || { echo "::error::remote install produced no SKILL.md"; exit 1; }
           head -1 /tmp/adremote/.hermes/skills/autonomous-ai-agents/autodev/SKILL.md | grep -q '---' \
             || { echo "::error::installed SKILL.md is not a skill file"; exit 1; }
-          echo "All generator + installer checks passed."
+          echo "Remote end-to-end install OK."

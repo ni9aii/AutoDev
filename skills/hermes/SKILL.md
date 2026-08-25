@@ -4,7 +4,7 @@ description: "AutoDev MVP: automated review → plan → execute → verify pipe
 version: 1.0.0
 author: ni9aii
 license: MIT
-platforms: [linux, windows, macos]
+platforms: [linux]
 metadata:
   hermes:
     tags: [AutoDev, Pipeline, Review, Code-Quality, CI, Automation, Rust]
@@ -175,8 +175,9 @@ Binaries install to `target/release/`. `cargo install --path .` puts
 
 ## CI
 
-GitHub Actions with an ubuntu + windows matrix:
-`cargo test` → `cargo clippy -- -D warnings` → `cargo build --release`.
+GitHub Actions builds/tests on an ubuntu + windows matrix
+(`cargo test` → `cargo clippy -- -D warnings` → `cargo build --release`);
+release binaries are published for Linux only.
 
 ## Phases
 

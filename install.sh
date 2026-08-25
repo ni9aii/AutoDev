@@ -121,6 +121,30 @@ run_remote() {
   echo "Downloading ${url}"
   curl -fsSL "$url" -o "$tmp/src.tar.gz"
 
+  # Integrity check: if a <tarball>.sha256 asset exists next to the tarball,
+  # verify it. GitHub archives do not ship checksums by default, so absence is
+  # not fatal — but it is called out loudly so users know the download was NOT
+  # verified.
+  if curl -fsSL "${url}.sha256" -o "$tmp/src.tar.gz.sha256" 2>/dev/null; then
+    command -v sha256sum >/dev/null 2>&1 || {
+      echo "ERROR: sha256sum is required to verify --remote downloads." >&2
+      exit 1
+    }
+    echo "Verifying sha256 checksum..."
+    # Accept both '<digest>  <file>' and bare '<digest>' checksum files by
+    # comparing first fields directly.
+    expected="$(awk 'NR==1{print $1}' "$tmp/src.tar.gz.sha256")"
+    actual="$(sha256sum "$tmp/src.tar.gz" | awk '{print $1}')"
+    if [ -z "$expected" ] || [ "$expected" != "$actual" ]; then
+      echo "ERROR: sha256 verification FAILED for ${tag} tarball." >&2
+      echo "The downloaded file does not match the published checksum — do not use it." >&2
+      exit 1
+    fi
+    echo "sha256 OK."
+  else
+    echo "WARNING: no .sha256 checksum published for ${tag}; download NOT verified." >&2
+  fi
+
   mkdir -p "$tmp/src"
   tar -xzf "$tmp/src.tar.gz" -C "$tmp/src" --strip-components=1
 
@@ -141,7 +165,13 @@ while [ $# -gt 0 ]; do
     --check)   MODE=check; shift ;;
     --update)  MODE=install; MODE_FLAGS=(--update); shift ;;
     --uninstall) MODE=uninstall; shift ;;
-    --remote)  shift; REMOTE_TAG="${1:-}"; [ $# -gt 0 ] && shift; MODE=remote ;;
+    --remote)
+      shift
+      REMOTE_TAG="${1:-}"
+      # `set -e` kills a bare `[ ... ] && shift` when the test fails (the
+      # documented no-TAG form `install.sh --remote`), so use an explicit if.
+      if [ $# -gt 0 ]; then shift; fi
+      MODE=remote ;;
     -h|--help) usage; exit 0 ;;
     *) echo "Unknown arg: $1" >&2; usage >&2; exit 1 ;;
   esac
