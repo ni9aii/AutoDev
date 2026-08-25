@@ -6,6 +6,11 @@
 #   ./install.sh --harness H     # force harness (hermes | claude-code)
 #   ./install.sh --list          # show supported harnesses
 #   ./install.sh --check         # verify install, no changes
+#   ./install.sh --update        # re-install latest from a checkout
+#   ./install.sh --remote [TAG]  # one-line install: fetch release tarball,
+#                                # then install (no checkout needed):
+#   curl -fsSL https://raw.githubusercontent.com/ni9aii/AutoDev/vX.Y.Z/install.sh | bash -s -- --remote [TAG]
+#   ./install.sh --uninstall     # remove the installed skill dir
 #
 # No Python required. Prerequisites: bash, git, rsync, and a symlink-capable
 # checkout (git core.symlinks=true; on Windows use WSL or enable symlinks).
@@ -15,7 +20,15 @@
 # SYMLINK to the shared root references/ (see tools/gen.sh); install.sh
 # dereferences it (-aL) so each installed skill dir is self-contained with
 # real files.
+#
+# Remote mode (--remote): downloads the release tarball
+# https://github.com/ni9aii/AutoDev/archive/refs/tags/<TAG>.tar.gz
+# (default TAG: latest GitHub release), unpacks it to a temp dir and runs the
+# bundled copy of this script from there — full reuse of the local logic.
 set -euo pipefail
+
+REPO="ni9aii/AutoDev"
+SELF_VERSION_MARKER="# AUTODEV_SKILL_VERSION"
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 GEN="$ROOT/tools/gen.sh"
@@ -47,15 +60,24 @@ detect_harness() {
 
 usage() {
   cat <<'EOF'
-Usage: ./install.sh [--harness H | --list | --check]
+Usage: ./install.sh [--harness H | --list | --check | --update | --uninstall | --remote [TAG]]
 
-  (no args)   auto-detect harness and install
-  --harness H install for harness H (hermes | claude-code)
-  --list      list supported harnesses
-  --check     verify install without changing anything
+  (no args)        auto-detect harness and install
+  --harness H      install for harness H (hermes | claude-code)
+  --list           list supported harnesses
+  --check          verify install without changing anything
+  --update         re-install (overwrite existing copy with current source)
+  --uninstall      remove the installed skill directory
+  --remote [TAG]   one-line install without a checkout: download release
+                   tarball vTAG (default: latest release), then install.
+                   Requires curl and tar.
 
   Env: AUTODEV_INSTALL_ROOT overrides the base dir (default $HOME).
        e.g. AUTODEV_INSTALL_ROOT=/tmp/test ./install.sh --harness claude-code
+
+  One-line install:
+    curl -fsSL https://raw.githubusercontent.com/ni9aii/AutoDev/vX.Y.Z/install.sh \
+      | bash -s -- --remote [TAG]
 EOF
 }
 
@@ -66,20 +88,81 @@ list_harnesses() {
   done
 }
 
+# ---- remote mode: fetch release tarball and re-exec local logic ----
+latest_tag() {
+  # Resolve the latest published release tag. curl + grep only (no jq dep).
+  local url="https://api.github.com/repos/${REPO}/releases/latest"
+  curl -fsSL "$url" | grep -o '"tag_name": *"[^"]*"' | head -1 | cut -d'"' -f4
+}
+
+run_remote() {
+  local tag="${1:-}"
+  command -v curl >/dev/null 2>&1 || { echo "ERROR: --remote requires curl." >&2; exit 1; }
+  command -v tar  >/dev/null 2>&1 || { echo "ERROR: --remote requires tar." >&2; exit 1; }
+
+  if [ -z "$tag" ]; then
+    echo "Resolving latest release..."
+    tag="$(latest_tag)"
+    if [ -z "$tag" ]; then
+      echo "ERROR: could not resolve the latest release tag." >&2
+      echo "Pass an explicit tag: --remote vX.Y.Z" >&2
+      exit 1
+    fi
+  fi
+  case "$tag" in
+    v[0-9]*.[0-9]*.[0-9]*) ;;
+    *) echo "ERROR: invalid tag '$tag' (expected vX.Y.Z)." >&2; exit 1 ;;
+  esac
+
+  local url="https://github.com/${REPO}/archive/refs/tags/${tag}.tar.gz"
+  local tmp; tmp="$(mktemp -d)"
+  trap 'rm -rf "$tmp"' EXIT
+
+  echo "Downloading ${url}"
+  curl -fsSL "$url" -o "$tmp/src.tar.gz"
+
+  mkdir -p "$tmp/src"
+  tar -xzf "$tmp/src.tar.gz" -C "$tmp/src" --strip-components=1
+
+  echo "Installing AutoDev ${tag} (remote mode)..."
+  # ${arr[@]+...}: safe expansion under `set -u` when the array is empty.
+  exec bash "$tmp/src/install.sh" ${MODE_FLAGS[@]+"${MODE_FLAGS[@]}"}
+}
+
 # ---- arg parse ----
 MODE=install
 HARNESS=""
+REMOTE_TAG=""
+MODE_FLAGS=()
 while [ $# -gt 0 ]; do
   case "$1" in
     --harness) HARNESS="${2:-}"; shift 2 ;;
     --list)    MODE=list; shift ;;
     --check)   MODE=check; shift ;;
+    --update)  MODE=install; MODE_FLAGS=(--update); shift ;;
+    --uninstall) MODE=uninstall; shift ;;
+    --remote)  shift; REMOTE_TAG="${1:-}"; [ $# -gt 0 ] && shift; MODE=remote ;;
     -h|--help) usage; exit 0 ;;
     *) echo "Unknown arg: $1" >&2; usage >&2; exit 1 ;;
   esac
 done
 
-[ "$MODE" = "list" ] && { list_harnesses; exit 0; }
+# Forward the resolved --harness decision to the inner (tarball) script so a
+# user's `--remote vX.Y.Z --harness claude-code` survives the exec even when
+# the tarball ships an older installer. Only forward what the user actually
+# asked for; otherwise the inner script auto-detects.
+if [ "$MODE" = "remote" ] && [ -n "$HARNESS" ]; then
+  case "${MODE_FLAGS[*]}" in
+    *"--harness"*) ;;               # already forwarded verbatim below
+    *) MODE_FLAGS=("${MODE_FLAGS[@]+"${MODE_FLAGS[@]}"}" --harness "$HARNESS") ;;
+  esac
+fi
+
+if [ "$MODE" = "list" ]; then list_harnesses; exit 0; fi
+
+if [ "$MODE" = "remote" ]; then
+  run_remote "$REMOTE_TAG"   # never returns (exec)
+fi
 
 if [ -z "$HARNESS" ]; then
   HARNESS="$(detect_harness)"
@@ -114,6 +197,16 @@ if [ "$MODE" = "check" ]; then
     echo "MISSING: $DST/SKILL.md (run ./install.sh --harness $HARNESS to install)"
     exit 1
   fi
+fi
+
+if [ "$MODE" = "uninstall" ]; then
+  if [ -d "$DST" ]; then
+    rm -rf "$DST"
+    echo "Removed: $DST"
+  else
+    echo "Nothing to uninstall: $DST does not exist."
+  fi
+  exit 0
 fi
 
 # re-render from source so the installed copy is never stale
@@ -170,8 +263,18 @@ if [ -d "$REFS_SRC" ]; then
   fi
 fi
 
+# Stamp installed version (C5 update path): taken from Cargo.toml by gen.sh —
+# see below. Falls back to unknown if the marker line was not produced.
+INSTALLED_VERSION="unknown"
+VERSION_LINE="$(grep -m1 '^version = "' "$ROOT/Cargo.toml" 2>/dev/null || true)"
+if [ -n "$VERSION_LINE" ]; then
+  INSTALLED_VERSION="$(printf '%s' "$VERSION_LINE" | cut -d'"' -f2)"
+fi
+printf '%s %s\n' "$SELF_VERSION_MARKER" "$INSTALLED_VERSION" > "$DST/.autodev-version"
+
 echo ""
-echo "Installed AutoDev skill for $HARNESS."
+echo "Installed AutoDev skill for $HARNESS (version $INSTALLED_VERSION)."
+echo "Re-run ./install.sh (or --update) after pulling new releases to refresh."
 if [ "$HARNESS" = "hermes" ]; then
   echo "Load it with: /skill autodev   (or /autodev if mapped as a quick command)"
   echo "Note: if you use the git-sync plugin, it manages ~/.hermes — re-sync after install."

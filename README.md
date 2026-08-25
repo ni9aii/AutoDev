@@ -42,6 +42,10 @@ and a machine-readable [`--json` summary](examples/json-output.json).
 The skill is the product. The fastest path is the one-command installer:
 
 ```bash
+curl -fsSL https://raw.githubusercontent.com/ni9aii/AutoDev/main/install.sh | bash -s -- --remote
+```
+
+```bash
 # From a checkout of this repo:
 ./install.sh                 # auto-detects your harness, installs there
 ./install.sh --harness hermes      # or force a specific harness
