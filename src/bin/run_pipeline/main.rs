@@ -16,6 +16,10 @@ enum Phase {
     Review,
     /// Run review + aggregate phases
     Plan,
+    /// Run execute phase only against an existing review timestamp directory
+    /// (resume/re-run execution after an interrupted run; pin the run with
+    /// AUTO_DEV_TIMESTAMP so the plan file `<ts>-plan.md` is found)
+    Execute,
     /// Run release phase (create git tag)
     Release,
 }
@@ -26,6 +30,7 @@ impl std::fmt::Display for Phase {
             Phase::Full => write!(f, "full"),
             Phase::Review => write!(f, "review"),
             Phase::Plan => write!(f, "plan"),
+            Phase::Execute => write!(f, "execute"),
             Phase::Release => write!(f, "release"),
         }
     }
@@ -77,6 +82,7 @@ mod tests {
         assert_eq!(Phase::Full.to_string(), "full");
         assert_eq!(Phase::Review.to_string(), "review");
         assert_eq!(Phase::Plan.to_string(), "plan");
+        assert_eq!(Phase::Execute.to_string(), "execute");
         assert_eq!(Phase::Release.to_string(), "release");
     }
 

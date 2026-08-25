@@ -38,6 +38,10 @@ pub(crate) fn run(pipeline: &Pipeline) -> anyhow::Result<()> {
             let review_dir = pipeline.run_review_phase()?;
             pipeline.run_aggregate_phase(&review_dir)?;
         }
+        Phase::Execute => {
+            let plan_path = pipeline.resume_plan_path()?;
+            pipeline.run_execute_phase(&plan_path)?;
+        }
         Phase::Full => {
             let review_dir = pipeline.run_review_phase()?;
             let plan_path = pipeline.run_aggregate_phase(&review_dir)?;

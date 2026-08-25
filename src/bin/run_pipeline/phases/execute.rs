@@ -51,6 +51,33 @@ pub(crate) fn format_fix_as_data(fix: &PlanItem, index: usize) -> String {
 }
 
 impl Pipeline {
+    /// Resolve the plan file for a resumed execute run: the plan produced by
+    /// an earlier review+aggregate run for this timestamp, at
+    /// `<dev_notes_root>/<project>/plans/<timestamp>-plan.md`. Fails fast with
+    /// an actionable message when it does not exist (the user likely forgot to
+    /// pin AUTO_DEV_TIMESTAMP to the interrupted run's timestamp).
+    pub(crate) fn resume_plan_path(&self) -> Result<PathBuf> {
+        let project_name = self
+            .project_name
+            .clone()
+            .unwrap_or_else(|| "unknown".to_string());
+        let plan_path = self
+            .dev_notes_root
+            .join(&project_name)
+            .join("plans")
+            .join(format!("{}-plan.md", self.timestamp));
+        if !plan_path.is_file() {
+            anyhow::bail!(
+                "no plan file found at {} — execute phase resumes an existing run; \
+                 pin the interrupted run's timestamp via AUTO_DEV_TIMESTAMP \
+                 (e.g., AUTO_DEV_TIMESTAMP={} run-pipeline . execute)",
+                plan_path.display(),
+                self.timestamp
+            );
+        }
+        Ok(plan_path)
+    }
+
     /// Execute phase: print fix instructions for the orchestrating agent.
     pub(crate) fn run_execute_phase(&self, plan_path: &PathBuf) -> Result<()> {
         log::log("=== PHASE 3: EXECUTE ===");
@@ -63,6 +90,8 @@ impl Pipeline {
             log::warn("No Do Now fixes found in plan");
             return Ok(());
         }
+
+        self.warn_on_sidecar_divergence(plan_path, &do_now_section);
 
         log::log(&format!(
             "Found Do Now section ({} chars)",
@@ -126,6 +155,43 @@ impl Pipeline {
     fn parse_fixes(&self, do_now_section: &str) -> Vec<PlanItem> {
         plan::parse_items(do_now_section)
     }
+
+    /// C7 step 1 (v0.9): detect divergence between the JSON sidecar and the
+    /// markdown plan. The sidecar is authoritative; if a human edited the
+    /// markdown by hand (or files went out of sync), say so loudly — this
+    /// data decides whether the markdown fallback parsers can be removed in
+    /// 0.10. Best-effort: any read/parse failure here is silent, because the
+    /// markdown path alone must keep working for pre-sidecar plans.
+    fn warn_on_sidecar_divergence(&self, plan_path: &std::path::Path, do_now_section: &str) {
+        let sidecar_path = plan_path.with_extension("json");
+        let Ok(sidecar_text) = std::fs::read_to_string(&sidecar_path) else {
+            return;
+        };
+        let Ok(doc) = serde_json::from_str::<plan::Plan>(&sidecar_text) else {
+            log::warn(&format!(
+                "Plan sidecar {} is not valid JSON — using markdown",
+                sidecar_path.display()
+            ));
+            return;
+        };
+        // Sidecar carries ALL items (Do Now + Defer + carried); compare only
+        // the Do Now slice against what the markdown parser produced.
+        let md_fixes = plan::parse_items(do_now_section);
+        let json_do_now: Vec<&plan::PlanItem> = doc
+            .items
+            .iter()
+            .filter(|i| !i.is_carried())
+            .take(md_fixes.len())
+            .collect();
+        if md_fixes.iter().ne(json_do_now) {
+            log::warn(&format!(
+                "DIVERGENCE: plan.md and plan.json disagree on the Do Now set \
+                 ({}) — using plan.md parse; if you hand-edited the plan, edit \
+                 the .json sidecar instead",
+                sidecar_path.display()
+            ));
+        }
+    }
 }
 
 #[cfg(test)]
@@ -135,6 +201,63 @@ mod tests {
 
     fn test_pipeline() -> Pipeline {
         Pipeline::test_default(Box::new(SystemRunner))
+    }
+
+    fn write_plan(dir: &std::path::Path, md: &str, json: Option<&str>) -> PathBuf {
+        let plan = dir.join("20260101_010101-plan.md");
+        std::fs::write(&plan, md).unwrap();
+        if let Some(j) = json {
+            std::fs::write(plan.with_extension("json"), j).unwrap();
+        }
+        plan
+    }
+
+    const MD_ONE_FIX: &str = "## Do Now\n\n### Fix 1: Improve error handling\n\n**Source:** Code Reviewer\n**Severity:** CRITICAL\n**File:** `src/lib.rs`\n**Description:**\nErrors are swallowed silently.\n";
+
+    #[test]
+    fn divergence_no_sidecar_is_silent() {
+        let pipeline = test_pipeline();
+        let dir = std::env::temp_dir().join("ad-div-none");
+        let _ = std::fs::create_dir_all(&dir);
+        let plan = write_plan(&dir, MD_ONE_FIX, None);
+        // Must not panic; warning path is best-effort.
+        pipeline
+            .warn_on_sidecar_divergence(&plan, "## Do Now\n\n### Fix 1: Improve error handling\n");
+    }
+
+    #[test]
+    fn divergence_matching_sidecar_warns_nothing() {
+        let pipeline = test_pipeline();
+        let dir = std::env::temp_dir().join("ad-div-match");
+        let _ = std::fs::create_dir_all(&dir);
+        let json = r#"{"generated":"2026-01-01","items":[{"role":"Code","severity":"CRITICAL","title":"Improve error handling","description":"Errors are swallowed silently.","file":"src/lib.rs","line":null,"carried_from":null,"attempt":0}]}"#;
+        let plan = write_plan(&dir, MD_ONE_FIX, Some(json));
+        pipeline
+            .warn_on_sidecar_divergence(&plan, "## Do Now\n\n### Fix 1: Improve error handling\n");
+    }
+
+    #[test]
+    fn divergence_edited_markdown_warns() {
+        let pipeline = test_pipeline();
+        let dir = std::env::temp_dir().join("ad-div-warn");
+        let _ = std::fs::create_dir_all(&dir);
+        let json = r#"{"generated":"2026-01-01","items":[{"role":"Code","severity":"CRITICAL","title":"Improve error handling","description":"Errors are swallowed silently.","file":"src/lib.rs","line":null,"carried_from":null,"attempt":0}]}"#;
+        let plan = write_plan(&dir, MD_ONE_FIX, Some(json));
+        // Markdown now has a SECOND fix the sidecar doesn't know about.
+        let edited = format!(
+            "{}\n### Fix 2: Hand-added item\n\n**Severity:** MINOR\n**Description:**\nHand edit.\n",
+            MD_ONE_FIX
+        );
+        pipeline.warn_on_sidecar_divergence(&plan, &edited);
+    }
+
+    #[test]
+    fn divergence_invalid_json_sidecar_does_not_crash() {
+        let pipeline = test_pipeline();
+        let dir = std::env::temp_dir().join("ad-div-badjson");
+        let _ = std::fs::create_dir_all(&dir);
+        let plan = write_plan(&dir, MD_ONE_FIX, Some("{not json"));
+        pipeline.warn_on_sidecar_divergence(&plan, MD_ONE_FIX);
     }
 
     #[test]

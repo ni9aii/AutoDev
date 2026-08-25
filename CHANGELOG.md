@@ -1,5 +1,18 @@
 # Changelog
 
+## [Unreleased]
+
+### Added
+- `run-pipeline --phase execute`: resume/re-run only the execute phase against
+  an existing review timestamp directory (pin the run with
+  `AUTO_DEV_TIMESTAMP`); fails fast with an actionable message when no plan
+  file exists for that timestamp.
+- Execute-phase divergence check (markdown→JSON migration, step 1): when the
+  `plan.json` sidecar exists but disagrees with the parsed `plan.md` Do Now
+  set (e.g. after a manual markdown edit), a loud warning is emitted. Data
+  collected here decides whether the markdown fallback parsers can be removed
+  in 0.10. Best-effort: missing/invalid sidecar stays silent.
+
 ## [0.8.0] - 2026-08-25
 
 ### Added
