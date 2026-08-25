@@ -71,7 +71,7 @@ update_block() {
   mv "$tmp" "$file"
 }
 
-update_block README.md
+update_block docs/project-structure.md
 update_block SKILL.core.md
 
 # Refresh the test counter in AGENTS.md (Task 4 of the retro plan): the count
@@ -89,4 +89,4 @@ if ! grep -q 'TEST-COUNT:BEGIN' "$AGENTS"; then
 fi
 sed -i "s|<!-- TEST-COUNT:BEGIN -->[0-9]*<!-- TEST-COUNT:END -->|<!-- TEST-COUNT:BEGIN -->${TEST_COUNT}<!-- TEST-COUNT:END -->|" "$AGENTS"
 
-echo "structure blocks updated: README.md SKILL.core.md; test count: $TEST_COUNT"
+echo "structure blocks updated: docs/project-structure.md SKILL.core.md; test count: $TEST_COUNT"

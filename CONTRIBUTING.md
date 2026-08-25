@@ -12,6 +12,7 @@ SKILL.md                     # Rendered generic surface (generated)
 references/                  # Canonical integration & pattern guides (single copy at repo root)
 skills/<harness>/references  # Committed SYMLINK -> ../../references (created/refreshed by gen.sh)
 skills/<harness>/SKILL.md    # Per-harness rendered surfaces (generated)
+docs/                        # User documentation (README links here)
 src/bin/                     # Optional Rust binaries (run-pipeline, etc.)
 tests/                       # Integration tests
 ```
@@ -55,6 +56,12 @@ The skill is documentation + workflow, so changes are usually edits to
 3. Build: `cargo build`
 4. Test: `cargo test`
 5. Lint: `cargo clippy -- -D warnings` (warnings are errors in CI)
+
+### Adding a new harness
+
+Supporting a new agent harness is intentionally small — one overlay file plus
+installer wiring. See [docs/new-harness.md](docs/new-harness.md) for the
+step-by-step recipe.
 
 ### Code style
 

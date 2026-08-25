@@ -13,252 +13,92 @@ pipeline it runs with its own native tools.
 
 ### Why AutoDev
 
-Most "vibe coding" stops at a first working draft. AutoDev is built to take an
-existing concept and **cycle it to done** — review → code → test (locally and
-on CI) → repeat, until *you* decide the project quality is good enough to
-release. Each loop tightens the code instead of shipping the lucky first pass.
+Most "vibe coding" stops at a first working draft. AutoDev takes an existing
+concept and **cycles it to done** — review → code → test (locally and on CI) →
+repeat, until *you* decide the project is good enough to release. Each loop
+tightens the code instead of shipping the lucky first pass.
 
-What makes that reliable:
-
-- **Loop until release-ready.** The pipeline re-runs review → execute → verify
-  on every iteration, so defects found late still get fixed, not deferred to a
-  "later" that never comes.
+- **Loop until release-ready.** Review → execute → verify re-runs every
+  iteration, so defects found late get fixed, not deferred.
 - **Local + CI, not just local.** Fixes are verified by your test suite *and*
-  GitHub Actions, so a green local run can't hide a broken CI.
+  GitHub Actions.
 - **Reproducible, file-based trail.** Every review, plan, and CI report lands
-  in `dev-notes/` as plain markdown — traceable, diffable, and git-friendly.
+  in `dev-notes/` as plain markdown — traceable, diffable, git-friendly.
 - **Multi-harness by design.** The skill is just `SKILL.md` + `references/`;
-  any agent harness can load it. The bundled Rust scripts are *optional
-  accelerators* for the mechanical steps (aggregation, CI status) — harnesses
-  that don't run them still get the full workflow through the agent's own
-  tools.
-
-See [`examples/`](examples/) for a fully worked sample: four review reports →
-a generated fix plan ([`examples/sample-project/plans/`](examples/sample-project/plans/))
-and a machine-readable [`--json` summary](examples/json-output.json).
+  any agent harness can load it. Bundled Rust binaries are *optional
+  accelerators*, not a requirement.
+- **Developed on itself.** Every AutoDev release was produced and hardened by
+  AutoDev's own review cycles — see [docs/development-by-cycles.md](docs/development-by-cycles.md).
 
 ## Install the skill into your harness
 
-The skill is the product. The fastest path is the one-command installer:
+One command — no checkout needed:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/ni9aii/AutoDev/main/install.sh | bash -s -- --remote
 ```
 
+The installer auto-detects your harness (Hermes, Claude Code), downloads a
+release tarball, and installs a self-contained copy of the skill with its
+references. Re-run the same command (or `install.sh --update` from a checkout)
+to upgrade; `--uninstall` removes it; a version stamp in the installed skill
+dir tells you which release you have.
+
+From a checkout instead:
+
 ```bash
-# From a checkout of this repo:
-./install.sh                 # auto-detects your harness, installs there
-./install.sh --harness hermes      # or force a specific harness
-./install.sh --harness claude-code
-./install.sh --list          # show supported harnesses + install paths
-./install.sh --check         # verify an install without changing anything
+git clone https://github.com/ni9aii/AutoDev && cd AutoDev
+./install.sh                 # auto-detects harness
+./install.sh --harness hermes | claude-code   # force one
+./install.sh --list          # supported harnesses + paths
+./install.sh --check         # verify install without changes
 ```
-
-`install.sh` re-renders the skill from `SKILL.core.md` + `harnesses/*.overlay`
-(see "How the skill is built" below) and installs the right `SKILL.md` (with a
-dereferenced, self-contained copy of `references/`) into your harness's skill
-directory. Currently supported:
-
-| Harness      | Install path                                      | Invoke with        |
-|--------------|---------------------------------------------------|--------------------|
-| Hermes       | `~/.hermes/skills/autonomous-ai-agents/autodev`   | `/skill autodev`   |
-| Claude Code  | `~/.claude/skills/autodev`                        | `/autodev`         |
 
 After install, load the skill in your agent and run a phase, e.g.
 `/autodev /path/to/project review`.
 
-### Manual install (alternative)
+| Harness     | Install path                                    | Invoke with      |
+|-------------|--------------------------------------------------|------------------|
+| Hermes      | `~/.hermes/skills/autonomous-ai-agents/autodev`  | `/skill autodev` |
+| Claude Code | `~/.claude/skills/autodev`                       | `/autodev`       |
 
-If you prefer not to run the script, copy the rendered skill by hand — the
-installer dereferences the `skills/<harness>/references` symlink so the
-installed directory stays self-contained:
-
-```bash
-# Hermes
-cp skills/hermes/SKILL.md ~/.hermes/skills/autonomous-ai-agents/autodev/SKILL.md
-rsync -aL skills/hermes/references/ ~/.hermes/skills/autonomous-ai-agents/autodev/references/
-
-# Claude Code
-cp skills/claude-code/SKILL.md ~/.claude/skills/autodev/SKILL.md
-rsync -aL skills/claude-code/references/ ~/.claude/skills/autodev/references/
-```
-
-> **That's it.** There is nothing to "run" from a terminal to use AutoDev — you
-> load the skill and let your agent drive it. The Rust binaries below are
-> optional accelerators, not a prerequisite.
-
-## How the skill is built
-
-`SKILL.md` surfaces are **generated**, not hand-written, so they can't drift
-across harnesses. The source of truth is:
-
-- `SKILL.core.md` — the workflow body, with `{{PLACEHOLDER}}` markers.
-- `harnesses/<h>.overlay` — frontmatter + per-harness text (invocation,
-  how reviewers/executors map to that harness's tools).
-
-`tools/gen.sh` (pure bash, no Python) renders `SKILL.md`,
-`skills/hermes/SKILL.md`, and `skills/claude-code/SKILL.md`, and creates or
-refreshes the per-harness symlinks `skills/<harness>/references ->
-../../references`, idempotently. The repo keeps ONE canonical `references/`
-at the root — the skill dirs carry only the link. CI runs `gen.sh`, checks
-that each symlink exists, points at the right target, and resolves to a
-readable file, and fails if a committed surface ever diverges from the source
-(`gen-check` job). To rebuild locally:
+## Quickstart
 
 ```bash
-bash tools/gen.sh
+run-pipeline /path/to/project review --project myproject    # 4 reviewers → reports
+run-pipeline /path/to/project plan --project myproject      # aggregate → fix plan
+run-pipeline /path/to/project full --project myproject      # all phases incl. verify
 ```
 
-## How it works
+Each run leaves a timestamped trail under `$DEV_NOTES_ROOT/<project>/`
+(reviews, plans as `.md` + machine-readable `.json`, CI reports). Your agent
+executes the plan; the pipeline verifies locally and on CI.
 
-| Layer | Role | Implementation |
-|-------|------|----------------|
-| **Skill** (`SKILL.md`) | Orchestration & decision-making for the whole pipeline | Agent-native |
-| `delegate_task` | Parallel reviewers, complex fixes | Agent-native (Hermes) |
-| `read_file` + `patch` | Simple fixes (≤2 files, ≤20 lines) | Agent-native |
-| `review-aggregator` | Finding aggregation, dedupe, plan generation | Rust binary (optional) |
-| `ci-check` | CI status + local test run | Rust binary (optional) |
-| `run-pipeline` | Full phase orchestration | Rust binary (optional) |
+## Documentation
 
-The pipeline is **agent-orchestrated**: reviews and fixes run as
-`delegate_task` subagents (or `read_file`+`patch` for simple fixes) driven by
-your agent. The Rust binaries are *accelerators* for the heavier mechanical
-steps (deduplicating findings across reviewers, hitting the GitHub API for CI
-status) — you can use the skill without them, or add them when you want the
-speedup.
+Full documentation lives in [`docs/`](docs/):
 
-### Execution model
+| Doc | Purpose |
+|-----|---------|
+| [docs/how-it-works.md](docs/how-it-works.md) | Architecture: skill layer vs Rust accelerators, execution model |
+| [docs/installation.md](docs/installation.md) | Installer details: flags, manual install, update/uninstall |
+| [docs/dev-notes-layout.md](docs/dev-notes-layout.md) | Artifact tree, file formats, plan sidecar contract |
+| [docs/configuration.md](docs/configuration.md) | Env vars (`GITHUB_TOKEN`, `DEV_NOTES_ROOT`, …) |
+| [docs/project-structure.md](docs/project-structure.md) | Repository layout (generated, drift-checked) |
+| [docs/development-by-cycles.md](docs/development-by-cycles.md) | How AutoDev develops itself, cycle by cycle |
+| [references/](references/) | Deep-dive notes: JSON output contract, troubleshooting, patterns |
 
-| Step | Executors | Requires |
-|------|-----------|----------|
-| Review / Execute | `delegate_task` / `read_file`+`patch` | Your agent only |
-| Aggregate / Verify | `review-aggregator`, `ci-check` binaries | Rust toolchain |
+## Examples
 
-The pipeline never invokes an external AI CLI, so it works regardless of any
-other tool's auth state.
+A fully worked sample: four review reports → a generated fix plan
+([`examples/sample-project/plans/`](examples/sample-project/plans/)) and a
+machine-readable [`--json` summary](examples/json-output.json).
 
-## Rust binaries (optional accelerators)
+## Contributing
 
-Only relevant if you want the binary speedups. Build and install:
-
-```bash
-cargo build --release
-cargo install --path .        # puts run-pipeline, review-aggregator, ci-check on PATH
-```
-
-`run-pipeline` also supports a `--json` flag that emits a machine-readable
-summary (status, version, phase, mode, timestamp, output dir) on **stdout** with
-all human log output routed to **stderr** — useful when your harness wraps the
-binary and parses its result programmatically.
-
-## dev-notes layout
-
-AutoDev keeps its intermediate artifacts in a dev-notes tree (default
-`~/Notes/dev-notes`, override via `--dev-notes-root` or the
-`DEV_NOTES_ROOT` env var). This is where the skill writes reviews, plans, and
-CI reports per project:
-
-```
-$DEV_NOTES_ROOT/
-└── <project>/
-    ├── reviews/
-    │   └── YYYYMMDD_HHMMSS/
-    │       ├── code-review.md
-    │       ├── security-review.md
-    │       ├── architecture-review.md
-    │       └── devops-review.md
-    ├── plans/
-    │   ├── YYYYMMDD_HHMMSS-plan.md
-    │   └── YYYYMMDD_HHMMSS-plan.json
-    └── ci-reports/
-        └── YYYYMMDD_HHMMSS-ci-status.md
-```
-
-## Configuration
-
-| Variable | Description |
-|----------|-------------|
-| `GITHUB_TOKEN` / `GITHUB_PAT` | GitHub API auth (CI checks, releases) |
-| `DEV_NOTES_ROOT` | Root for dev-notes paths (default: `~/Notes/dev-notes`) |
-
-## Project structure
-
-<!-- STRUCTURE:BEGIN -->
-```text
-.
-├── bin_contract.rs
-├── git.rs
-├── github.rs
-├── lib.rs
-├── log.rs
-├── markdown.rs
-├── plan.rs
-├── process.rs
-├── severity.rs
-├── test_runner.rs
-├── validation.rs
-├── bin/
-│   ├── ci_check/
-│   │   ├── checks.rs
-│   │   ├── main.rs
-│   │   ├── report.rs
-│   ├── review_aggregator/
-│   │   ├── findings.rs
-│   │   ├── main.rs
-│   │   ├── parse.rs
-│   │   ├── plan.rs
-│   ├── run_pipeline/
-│   │   ├── main.rs
-├── aggregator.rs
-├── release.rs
-├── run_pipeline.rs
-├── common/
-│   ├── mod.rs
-├── gen-structure.sh
-├── gen.sh
-├── workflows/
-│   ├── ci.yml
-│   ├── release.yml
-├── claude-code/
-│   ├── SKILL.md
-├── hermes/
-│   ├── SKILL.md
-├── claude-code.overlay
-├── generic.overlay
-├── hermes.overlay
-├── agents-md-bootstrap.md
-├── dev-notes-schema.md
-├── git-sync-checklist.md
-├── hermes-delegate-task-integration.md
-├── iteration-2-patterns.md
-├── json-output.md
-├── plan-autodev-integration.md
-├── rust-conventions.md
-├── skill-walkthrough.md
-├── troubleshooting.md
-├── Cargo.toml
-├── SKILL.core.md
-├── README.md
-├── AGENTS.md
-├── install.sh
-├── renovate.json
-```
-<!-- STRUCTURE:END -->
-
-## References
-
-Deeper integration and pattern notes (not required to use the skill, but
-useful when adapting it):
-
-| File | Purpose |
-|------|---------|
-| `references/skill-walkthrough.md` | Phase-by-phase view of what the skill does |
-| `references/hermes-delegate-task-integration.md` | `delegate_task` subagent integration (current code) |
-| `references/dev-notes-schema.md` | Exact dev-notes layout, artifact paths, finding format |
-| `references/json-output.md` | `run-pipeline --json` output contract |
-| `references/iteration-2-patterns.md` | Report parser patterns, Do Now/Defer, regression checklist |
-| `references/troubleshooting.md` | FAQ: Claude auth, empty reviews, dev-notes not found |
-| `references/git-sync-checklist.md` | Pre/post-work git sync steps |
+See [CONTRIBUTING.md](CONTRIBUTING.md). Adding support for a new agent harness
+is a single overlay file plus installer wiring — see
+[docs/new-harness.md](docs/new-harness.md).
 
 ## License
 
