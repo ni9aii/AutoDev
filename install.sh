@@ -121,28 +121,39 @@ run_remote() {
   echo "Downloading ${url}"
   curl -fsSL "$url" -o "$tmp/src.tar.gz"
 
-  # Integrity check: if a <tarball>.sha256 asset exists next to the tarball,
-  # verify it. GitHub archives do not ship checksums by default, so absence is
-  # not fatal — but it is called out loudly so users know the download was NOT
-  # verified.
-  if curl -fsSL "${url}.sha256" -o "$tmp/src.tar.gz.sha256" 2>/dev/null; then
+  # Integrity check: look up the release's `AutoDev-<tag>-sha256.txt` asset
+  # via the GitHub release API (codeload archives never have a `<url>.sha256`
+  # sibling, so probing that was false assurance). The checksum file lists one
+  # "<digest>  <filename>" line per release artifact, including the source
+  # tarball downloaded above ("<tag>.tar.gz"). If the asset is missing, fall
+  # back to a loud warning: the download was NOT verified.
+  local api="https://api.github.com/repos/${REPO}/releases/tags/${tag}"
+  local tarball_name="${tag}.tar.gz"
+  local checksum_url
+  checksum_url="$(curl -fsSL "$api" 2>/dev/null \
+    | grep -o '"browser_download_url": *"[^"]*"' | cut -d'"' -f4 \
+    | grep -- "AutoDev-${tag}-sha256.txt$" | head -1 || true)"
+  if [ -n "$checksum_url" ]; then
     command -v sha256sum >/dev/null 2>&1 || {
       echo "ERROR: sha256sum is required to verify --remote downloads." >&2
       exit 1
     }
-    echo "Verifying sha256 checksum..."
-    # Accept both '<digest>  <file>' and bare '<digest>' checksum files by
-    # comparing first fields directly.
-    expected="$(awk 'NR==1{print $1}' "$tmp/src.tar.gz.sha256")"
+    echo "Verifying sha256 checksum (${checksum_url})..."
+    curl -fsSL "$checksum_url" -o "$tmp/SHA256.txt"
+    expected="$(awk -v t="$tarball_name" '$2 == t { print $1 }' "$tmp/SHA256.txt")"
+    if [ -z "$expected" ]; then
+      echo "ERROR: checksum asset does not list ${tarball_name}; cannot verify." >&2
+      exit 1
+    fi
     actual="$(sha256sum "$tmp/src.tar.gz" | awk '{print $1}')"
-    if [ -z "$expected" ] || [ "$expected" != "$actual" ]; then
+    if [ "$expected" != "$actual" ]; then
       echo "ERROR: sha256 verification FAILED for ${tag} tarball." >&2
       echo "The downloaded file does not match the published checksum — do not use it." >&2
       exit 1
     fi
     echo "sha256 OK."
   else
-    echo "WARNING: no .sha256 checksum published for ${tag}; download NOT verified." >&2
+    echo "WARNING: no AutoDev-${tag}-sha256.txt release asset found; download NOT verified." >&2
   fi
 
   mkdir -p "$tmp/src"

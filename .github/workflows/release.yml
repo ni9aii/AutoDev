@@ -51,6 +51,22 @@ jobs:
           . $HOME/.cargo/env
           cargo test --locked --release --verbose
 
+      - name: Generate checksums
+        # Publishes AutoDev-<tag>-sha256.txt as a release asset. One
+        # "<digest>  <filename>" line per artifact; install.sh --remote matches
+        # its downloaded tarball by the "<tag>.tar.gz" filename column (the
+        # codeload archive is re-fetched here so its digest is real, not
+        # assumed).
+        run: |
+          TAG="${GITHUB_REF_NAME}"
+          cd target/release
+          {
+            sha256sum run-pipeline ci-check review-aggregator
+            curl -fsSL "https://github.com/${GITHUB_REPOSITORY}/archive/refs/tags/${TAG}.tar.gz" \
+              | sha256sum | awk -v t="${TAG}.tar.gz" '{ print $1 "  " t }'
+          } > "AutoDev-${TAG}-sha256.txt"
+          cat "AutoDev-${TAG}-sha256.txt"
+
       - name: Attach release binaries
         uses: softprops/action-gh-release@c12583777ecdfd3be55c69cf75464299dc01057e # v3
         with:
@@ -58,3 +74,4 @@ jobs:
             target/release/run-pipeline
             target/release/ci-check
             target/release/review-aggregator
+            target/release/AutoDev-*-sha256.txt
