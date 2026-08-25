@@ -7,6 +7,28 @@ impl Pipeline {
     pub(crate) fn run_aggregate_phase(&self, review_dir: &Path) -> Result<PathBuf> {
         log::log("=== PHASE 2: AGGREGATE ===");
 
+        // Guard (Task 4): in hermes mode the review phase only prints
+        // instructions; if the agent never ran them, the review dir holds no
+        // reports. Fail fast with an actionable message instead of letting the
+        // aggregator silently emit an empty plan. Reports may live directly in
+        // the dir or in its per-run `<ts>` subdirectory — search recursively.
+        let has_reports = walkdir::WalkDir::new(review_dir)
+            .max_depth(2)
+            .into_iter()
+            .filter_map(|e| e.ok())
+            .any(|e| {
+                e.file_type().is_file()
+                    && e.file_name()
+                        .to_str()
+                        .is_some_and(|n| n.ends_with("-review.md"))
+            });
+        if !has_reports {
+            anyhow::bail!(
+                "no review reports found in {} — review instructions were not executed?",
+                review_dir.display()
+            );
+        }
+
         let plan_path = if self.hermes_mode {
             // project_name is validated (allowlist) at Pipeline::new time in
             // all modes, so joining it onto the dev-notes root is safe.

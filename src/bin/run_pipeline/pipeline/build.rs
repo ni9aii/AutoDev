@@ -42,7 +42,11 @@ pub(crate) struct Pipeline {
 
 impl Pipeline {
     pub(crate) fn new(args: Args) -> Result<Self> {
-        let timestamp = chrono::Local::now().format("%Y%m%d_%H%M%S").to_string();
+        // AUTO_DEV_TIMESTAMP pins the run timestamp (tests use it to locate
+        // hermes-mode review dirs deterministically; also useful for
+        // reproducing a specific run).
+        let timestamp = std::env::var("AUTO_DEV_TIMESTAMP")
+            .unwrap_or_else(|_| chrono::Local::now().format("%Y%m%d_%H%M%S").to_string());
 
         // Validate project_path: must exist and not contain path traversal
         let project_path = std::fs::canonicalize(&args.project_path)

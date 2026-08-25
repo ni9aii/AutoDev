@@ -23,7 +23,7 @@ never the rendered `SKILL.md` files; keep renders in sync with
 ```bash
 cargo build --locked
 cargo test --locked            # unit + integration suite (lib, 3 bins, per-feature test files)
-                               # current count: <!-- TEST-COUNT:BEGIN -->75<!-- TEST-COUNT:END -->
+                               # current count: <!-- TEST-COUNT:BEGIN -->76<!-- TEST-COUNT:END -->
 cargo clippy --locked -- -D warnings
 cargo fmt --check
 bash tools/gen.sh && bash tools/gen-structure.sh && git diff --exit-code  # skill + structure drift check

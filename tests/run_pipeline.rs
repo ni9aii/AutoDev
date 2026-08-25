@@ -54,6 +54,17 @@ fn integration_run_pipeline_plan_end_to_end() {
     assert!(init.success(), "git init failed");
 
     fs::create_dir_all(td.path.join(project).join("reviews")).unwrap();
+    // Aggregate phase requires at least one review report (guard). In hermes
+    // mode the review phase targets <root>/<project>/reviews/<ts>/ — pinned
+    // via AUTO_DEV_TIMESTAMP so the fixture lands in the right directory.
+    let ts = "20260101_000000";
+    let review_dir = td.path.join(project).join("reviews").join(ts);
+    fs::create_dir_all(&review_dir).unwrap();
+    fs::write(
+        review_dir.join("code-review.md"),
+        "### [MINOR] sample\nDescription\nFile: `src/lib.rs`\nLine: 1\n",
+    )
+    .unwrap();
 
     let status = Command::new(env!("CARGO_BIN_EXE_run-pipeline"))
         .args([
@@ -64,6 +75,7 @@ fn integration_run_pipeline_plan_end_to_end() {
             "--project",
             project,
         ])
+        .env("AUTO_DEV_TIMESTAMP", "20260101_000000")
         .output()
         .expect("spawn run-pipeline");
 
@@ -82,6 +94,53 @@ fn integration_run_pipeline_plan_end_to_end() {
     assert!(
         plan.contains("Auto-Dev Fix Plan"),
         "plan content unexpected"
+    );
+}
+
+/// Guard (architecture plan Task 4): hermes-mode review phase only PRINTS
+/// instructions — if the agent never ran them, the review dir contains no
+/// reports. Aggregate must fail fast with an actionable message instead of
+/// silently producing an empty plan.
+#[test]
+fn integration_run_pipeline_plan_fails_on_missing_reviews() {
+    let td = TempDir::new("run-plan-guard");
+    let project = "e2e-guard";
+
+    let init = Command::new("git")
+        .args(["init", "-q"])
+        .current_dir(&td.path)
+        .status()
+        .expect("git init");
+    assert!(init.success(), "git init failed");
+
+    // Review dir exists but contains NO *-review.md files.
+    fs::create_dir_all(td.path.join(project).join("reviews")).unwrap();
+
+    let out = Command::new(env!("CARGO_BIN_EXE_run-pipeline"))
+        .args([
+            td.path.to_str().unwrap(),
+            "plan",
+            "--dev-notes-root",
+            td.path.to_str().unwrap(),
+            "--project",
+            project,
+        ])
+        .output()
+        .expect("spawn run-pipeline");
+
+    assert!(
+        !out.status.success(),
+        "aggregate must fail when no review reports exist"
+    );
+    let combined = format!(
+        "{}{}",
+        String::from_utf8_lossy(&out.stdout),
+        String::from_utf8_lossy(&out.stderr)
+    );
+    assert!(
+        combined.contains("no review reports found"),
+        "error should name the missing-reviews cause, got:\n{}",
+        combined
     );
 }
 
@@ -111,6 +170,16 @@ fn integration_run_pipeline_full_end_to_end() {
     // no-op so the verify phase's local-test check passes cheaply.
     fs::write(td.path.join("Makefile"), "test:\n\t@echo ok\n").unwrap();
     fs::create_dir_all(td.path.join(project).join("reviews")).unwrap();
+    // Aggregate phase requires at least one review report (guard); hermes
+    // review dir is <root>/<project>/reviews/<ts>/ with the pinned timestamp.
+    let ts = "20260101_000000";
+    let review_dir = td.path.join(project).join("reviews").join(ts);
+    fs::create_dir_all(&review_dir).unwrap();
+    fs::write(
+        review_dir.join("code-review.md"),
+        "### [MINOR] sample\nDescription\nFile: `src/lib.rs`\nLine: 1\n",
+    )
+    .unwrap();
 
     let out = Command::new(env!("CARGO_BIN_EXE_run-pipeline"))
         .args([
@@ -121,6 +190,7 @@ fn integration_run_pipeline_full_end_to_end() {
             "--project",
             project,
         ])
+        .env("AUTO_DEV_TIMESTAMP", "20260101_000000")
         .output()
         .expect("spawn run-pipeline");
 
