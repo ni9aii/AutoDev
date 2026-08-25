@@ -102,7 +102,6 @@ mod tests {
             project_path: StdPathBuf::from("."),
             phase: crate::Phase::Release,
             version: Some("v1.2.3".to_string()),
-            hermes_mode: false,
             project_name: None,
             timestamp: "20260101_000000".to_string(),
             output_dir: StdPathBuf::from("."),

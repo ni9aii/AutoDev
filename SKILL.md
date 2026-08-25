@@ -83,15 +83,9 @@ run-pipeline /path/to/project review --project myproject
 # Review + plan
 run-pipeline /path/to/project plan --project myproject
 
-# Release (same in both modes)
+# Release
 run-pipeline /path/to/project release --release-version v0.6.0
 ```
-
-> **Legacy mode** (shells out to the `claude -p` CLI) exists for agents that
-> wrap Claude Code; opt in with `--legacy-claude`. `run-pipeline` runs a
-> pre-flight auth check and fails fast with a clear message if the CLI is
-> missing or its OAuth session is expired. When Claude Code auth is
-> unavailable, stay in the default delegate_task mode.
 
 ## Build (optional)
 

@@ -114,26 +114,24 @@ bash tools/gen.sh
 | `read_file` + `patch` | Simple fixes (≤2 files, ≤20 lines) | Agent-native |
 | `review-aggregator` | Finding aggregation, dedupe, plan generation | Rust binary (optional) |
 | `ci-check` | CI status + local test run | Rust binary (optional) |
-| `run-pipeline` | Full phase orchestration (Hermes or legacy mode) | Rust binary (optional) |
+| `run-pipeline` | Full phase orchestration | Rust binary (optional) |
 
-In the default **Hermes mode** the entire pipeline executes with your agent's
-own tools. The Rust binaries are *accelerators* for the heavier mechanical
+The pipeline is **agent-orchestrated**: reviews and fixes run as
+`delegate_task` subagents (or `read_file`+`patch` for simple fixes) driven by
+your agent. The Rust binaries are *accelerators* for the heavier mechanical
 steps (deduplicating findings across reviewers, hitting the GitHub API for CI
 status) — you can use the skill without them, or add them when you want the
 speedup.
 
-### Two execution modes
+### Execution model
 
-| Mode | Executors | Requires |
+| Step | Executors | Requires |
 |------|-----------|----------|
-| **Hermes** (default) | `delegate_task` / `read_file`+`patch` | Your agent only |
-| Legacy | shells out to the `claude -p` CLI | Claude Code CLI, authenticated |
+| Review / Execute | `delegate_task` / `read_file`+`patch` | Your agent only |
+| Aggregate / Verify | `review-aggregator`, `ci-check` binaries | Rust toolchain |
 
-Hermes mode is the integration target for harness users — it never invokes an
-external binary, so it works regardless of any other tool's auth state. The
-legacy mode is a fallback for agents that wrap Claude Code; it runs a pre-flight
-auth check and fails fast with a clear message if `claude` is missing or its
-OAuth session has expired (see issue #1).
+The pipeline never invokes an external AI CLI, so it works regardless of any
+other tool's auth state.
 
 ## Rust binaries (optional accelerators)
 

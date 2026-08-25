@@ -48,13 +48,6 @@ struct Args {
     #[arg(short = 'V', long = "release-version")]
     version: Option<String>,
 
-    /// Hermes mode: reviews are performed by delegate_task subagents (default).
-    /// Legacy mode shells out to the Claude Code CLI; opt in with
-    /// `--legacy-claude` (plan finding: `--hermes-mode` with SetTrue +
-    /// default=true could never be disabled, leaving legacy code unreachable).
-    #[arg(long = "legacy-claude", default_value = "false")]
-    hermes_mode: bool, // true when NOT --legacy-claude
-
     /// Project name for dev-notes path construction
     #[arg(long)]
     project: Option<String>,
@@ -78,8 +71,6 @@ fn main() -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use auto_dev_pipeline::process::{mock_output, MockRunner};
-    use std::path::PathBuf as StdPathBuf;
 
     #[test]
     fn test_phase_display() {
@@ -102,66 +93,5 @@ mod tests {
         assert!(auto_dev_pipeline::validation::validate_version("not-a-version").is_err());
         assert!(auto_dev_pipeline::validation::validate_version("1.0").is_err());
         assert!(auto_dev_pipeline::validation::validate_version("-v1.0.0").is_err());
-    }
-
-    #[test]
-    fn test_check_claude_auth_passes_when_authenticated() {
-        let mock = MockRunner::new();
-        mock.push_response(mock_output(true, "OK", ""));
-        let pipeline = Pipeline {
-            project_path: StdPathBuf::from("."),
-            phase: Phase::Full,
-            version: None,
-            hermes_mode: false,
-            project_name: None,
-            timestamp: "20260101_000000".to_string(),
-            output_dir: StdPathBuf::from("."),
-            dev_notes_root: StdPathBuf::from("."),
-            json: false,
-            runner: Box::new(mock),
-        };
-        assert!(pipeline.check_claude_auth().is_ok());
-    }
-
-    #[test]
-    fn test_check_claude_auth_fails_on_expired_oauth() {
-        let mock = MockRunner::new();
-        mock.push_response(mock_output(
-            false,
-            "",
-            "Failed to authenticate: OAuth session expired",
-        ));
-        let pipeline = Pipeline {
-            project_path: StdPathBuf::from("."),
-            phase: Phase::Full,
-            version: None,
-            hermes_mode: false,
-            project_name: None,
-            timestamp: "20260101_000000".to_string(),
-            output_dir: StdPathBuf::from("."),
-            dev_notes_root: StdPathBuf::from("."),
-            json: false,
-            runner: Box::new(mock),
-        };
-        assert!(pipeline.check_claude_auth().is_err());
-    }
-
-    #[test]
-    fn test_check_claude_auth_fails_when_binary_missing() {
-        let mock = MockRunner::new();
-        mock.push_error("No such file or directory (os error 2)");
-        let pipeline = Pipeline {
-            project_path: StdPathBuf::from("."),
-            phase: Phase::Full,
-            version: None,
-            hermes_mode: false,
-            project_name: None,
-            timestamp: "20260101_000000".to_string(),
-            output_dir: StdPathBuf::from("."),
-            dev_notes_root: StdPathBuf::from("."),
-            json: false,
-            runner: Box::new(mock),
-        };
-        assert!(pipeline.check_claude_auth().is_err());
     }
 }

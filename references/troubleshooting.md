@@ -2,22 +2,6 @@
 
 Common issues when integrating or running AutoDev.
 
-## "Claude Code CLI is not authenticated"
-
-```
-[auto-dev] ERROR Claude Code CLI is installed but NOT authenticated.
-[auto-dev] ERROR Re-authenticate with: claude (interactive login)
-[auto-dev] ERROR Or use --hermes-mode for delegate_task-based execution.
-```
-
-This only happens in **legacy mode** (`--legacy-claude`), which shells out to
-`claude -p`. The pre-flight auth check caught an expired/missing OAuth session.
-
-**Fix:** drop `--legacy-claude` and use the default delegate_task mode. It never
-calls `claude`, so it works regardless of Claude Code's auth state (see issue
-#1). If you specifically need legacy mode, re-authenticate with `claude`
-interactively.
-
 ## `review-aggregator` exits with "No review directories found"
 
 The aggregator looks for `<dev-notes-root>/<project>/reviews/` and the latest

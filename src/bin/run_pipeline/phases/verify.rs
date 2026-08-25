@@ -13,12 +13,8 @@ impl Pipeline {
         log::log("Checking CI status...");
         let req = auto_dev_pipeline::bin_contract::CiCheckRequest {
             project_path: self.project_path.clone(),
-            project: if self.hermes_mode {
-                self.project_name.clone()
-            } else {
-                None
-            },
-            dev_notes: self.hermes_mode,
+            project: self.project_name.clone(),
+            dev_notes: true,
         };
         let args = req.to_args();
         let arg_refs: Vec<&str> = args.iter().map(|s| s.as_str()).collect();

@@ -12,16 +12,14 @@ mode** — it never calls an external binary and works with your agent alone.
 
 | Mode | Reviewers | Executor for fixes | Requires |
 |------|-----------|-------------------|----------|
-| **Hermes** (default, ``) | `delegate_task` (4 parallel reviewers) | `read_file`+`patch` (simple) or `delegate_task` (complex) | Your agent only |
-| Legacy | `claude -p` CLI | `claude -p` CLI | Claude Code CLI, authenticated |
+| **delegate_task** | `delegate_task` (4 parallel reviewers) | `read_file`+`patch` (simple) or `delegate_task` (complex) | Your agent only |
 
-Legacy mode is a fallback for agents that wrap Claude Code. It runs a pre-flight
-`claude -p "reply with the single word: OK"` auth check and fails fast if the CLI
-is missing or its OAuth session has expired (see issue #1). Prefer Hermes mode.
+Reviews and fixes never invoke an external AI CLI; the orchestrating agent
+drives everything with its own tools.
 
 ## Phase 1 — Review (parallel `delegate_task`)
 
-In Hermes mode `run-pipeline review ` prints `delegate_task`
+`run-pipeline review` prints `delegate_task`
 instructions for four reviewers. Each reviewer is its own subagent call. Launch
 three first, then the fourth separately (Hermes `max_concurrent_children` is 3).
 
@@ -99,9 +97,8 @@ patch(path="/path/to/file", old_string="...", new_string="...")
 **Complex fixes (3+ files, refactors, CI changes):** dispatch a `delegate_task`
 with the fix title, severity, file, and description from the plan.
 
-The Rust `run-pipeline` Hermes executor does exactly this split
-(`execute_via_claude` is only used in legacy mode). When driving the skill
-manually, follow the same heuristic:
+The `run-pipeline` execute phase follows the same split. When driving
+the skill manually, apply the same heuristic:
 
 - `files <= 2 && lines <= 20` → `read_file` + `patch`
 - otherwise → `delegate_task`

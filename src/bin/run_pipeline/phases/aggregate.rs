@@ -29,9 +29,9 @@ impl Pipeline {
             );
         }
 
-        let plan_path = if self.hermes_mode {
-            // project_name is validated (allowlist) at Pipeline::new time in
-            // all modes, so joining it onto the dev-notes root is safe.
+        let plan_path = {
+            // project_name is validated (allowlist) at Pipeline::new time, so
+            // joining it onto the dev-notes root is safe.
             let project_name = self
                 .project_name
                 .clone()
@@ -39,23 +39,13 @@ impl Pipeline {
             let plans_dir = self.dev_notes_root.join(&project_name).join("plans");
             std::fs::create_dir_all(&plans_dir)?;
             plans_dir.join(format!("{}-plan.md", self.timestamp))
-        } else {
-            self.output_dir.join(format!("{}-plan.md", self.timestamp))
         };
 
         let req = auto_dev_pipeline::bin_contract::AggregateRequest {
             input_dir: review_dir.to_path_buf(),
             output: plan_path.clone(),
-            project: if self.hermes_mode {
-                self.project_name.clone()
-            } else {
-                None
-            },
-            dev_notes_root: if self.hermes_mode {
-                Some(self.dev_notes_root.clone())
-            } else {
-                None
-            },
+            project: self.project_name.clone(),
+            dev_notes_root: Some(self.dev_notes_root.clone()),
         };
         let args = req.to_args();
         let arg_refs: Vec<&str> = args.iter().map(|s| s.as_str()).collect();

@@ -31,7 +31,6 @@ pub(crate) struct Pipeline {
     pub(crate) project_path: PathBuf,
     pub(crate) phase: Phase,
     pub(crate) version: Option<String>,
-    pub(crate) hermes_mode: bool,
     pub(crate) project_name: Option<String>,
     pub(crate) timestamp: String,
     pub(crate) output_dir: PathBuf,
@@ -59,16 +58,9 @@ impl Pipeline {
         // both modes join it onto the dev-notes root.
         let project_name = resolve_project_name(args.project.clone(), &project_path)?;
 
-        let output_dir = if !args.hermes_mode {
-            dev_notes_root
-                .join(&project_name)
-                .join("reviews")
-                .join(&timestamp)
-        } else {
-            dirs::home_dir()
-                .unwrap_or_else(|| PathBuf::from("."))
-                .join(".hermes/plans/auto-dev")
-        };
+        let output_dir = dirs::home_dir()
+            .unwrap_or_else(|| PathBuf::from("."))
+            .join(".hermes/plans/auto-dev");
 
         std::fs::create_dir_all(&output_dir)?;
 
@@ -76,8 +68,6 @@ impl Pipeline {
             project_path,
             phase: args.phase,
             version: args.version,
-            // CLI flag is --legacy-claude (opt-in); hermes_mode is its negation.
-            hermes_mode: !args.hermes_mode,
             project_name: Some(project_name),
             timestamp,
             output_dir,
