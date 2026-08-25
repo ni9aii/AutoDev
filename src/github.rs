@@ -121,8 +121,14 @@ mod tests {
     use super::*;
     use crate::process::{mock_output, MockRunner};
 
+    /// Environment variables are process-global and cargo runs tests in this
+    /// module in parallel threads — serialize every env-mutating test so they
+    /// cannot stomp each other's GITHUB_PAT/GITHUB_TOKEN (CI flake).
+    static ENV_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
     #[test]
     fn resolve_token_prefers_github_pat() {
+        let _env = ENV_LOCK.lock().unwrap();
         // Environment variables are process-global; tests in this module that
         // touch GITHUB_PAT/GITHUB_TOKEN run under cargo's default per-file
         // lock when placed in one test binary. Set BOTH env vars and a gh
@@ -146,6 +152,7 @@ mod tests {
 
     #[test]
     fn resolve_token_falls_back_to_github_token_before_gh() {
+        let _env = ENV_LOCK.lock().unwrap();
         std::env::remove_var("GITHUB_PAT");
         std::env::set_var("GITHUB_TOKEN", "tok-value");
         let mock = MockRunner::new();
@@ -164,6 +171,7 @@ mod tests {
 
     #[test]
     fn resolve_token_none_when_all_sources_fail() {
+        let _env = ENV_LOCK.lock().unwrap();
         // Neither env var set (best effort) and gh fails.
         std::env::remove_var("GITHUB_PAT");
         std::env::remove_var("GITHUB_TOKEN");
