@@ -13,16 +13,27 @@ pub fn extract_section(content: &str, section_name: &str) -> String {
     let lines: Vec<&str> = content.lines().collect();
     let mut result = Vec::new();
     let mut in_section = false;
+    // Depth of the heading that opened the section; the section ends only at
+    // a heading of the same or shallower depth (a `### Fix N:` item inside a
+    // `## Do Now` section must NOT terminate it).
+    let mut section_depth = 0usize;
     let target = section_name.trim().to_lowercase();
 
     for line in &lines {
         if let Some(heading) = heading_text(line) {
-            if heading_matches(heading, &target) {
+            let depth = line.chars().take_while(|&c| c == '#').count();
+            if !in_section && heading_matches(heading, &target) {
                 in_section = true;
+                section_depth = depth;
                 result.push(line.to_string());
                 continue;
             } else if in_section {
-                break;
+                if depth <= section_depth {
+                    break;
+                }
+                // Deeper heading inside the section: keep it as content.
+                result.push(line.to_string());
+                continue;
             }
         }
 
@@ -64,6 +75,36 @@ pub fn safe_truncate(s: &str, max_chars: usize) -> &str {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_extract_section_keeps_deeper_headings_inside_section() {
+        // Regression (architecture plan Task 1): a `### Fix N:` item heading
+        // inside the `## Do Now` section must NOT terminate it. Previously any
+        // heading ended the section, so real aggregator plans yielded a
+        // header-only section and execute found zero fixes.
+        let content = "\
+## Summary
+
+## 🔴 Do Now (Quick Wins)
+
+### Fix 1: Alpha
+
+**Description:**
+body one
+
+### Fix 2: Beta
+
+body two
+
+## 🟡 Defer to Next Phase
+
+### Deferred 1: Gamma
+";
+        let section = extract_section(content, "Do Now");
+        assert!(section.contains("### Fix 1: Alpha"), "item heading lost");
+        assert!(section.contains("Alpha") && section.contains("Beta"));
+        assert!(!section.contains("Gamma"), "section bled into Defer");
+    }
 
     #[test]
     fn test_extract_section_found() {

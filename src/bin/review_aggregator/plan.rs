@@ -1,174 +1,72 @@
 //! Generation of the prioritized fix plan markdown file.
+//!
+//! Rendering and parsing both go through the shared typed model
+//! (`auto_dev_pipeline::plan`) — one producer, one consumer (Task 1).
 
 use anyhow::Result;
 use std::collections::HashMap;
 use std::fs;
 use std::path::Path;
 
+use auto_dev_pipeline::markdown;
+use auto_dev_pipeline::plan::{self, PlanItem};
+
 use super::findings::{prioritize_findings, Finding};
 
-/// One deferred item extracted from a PREVIOUS plan for carry-over.
-#[derive(Debug, Clone, PartialEq)]
-pub(crate) struct CarriedDefer {
-    pub(crate) title: String,
-    pub(crate) role: String,
-    pub(crate) severity: String,
-    pub(crate) file: Option<String>,
-    pub(crate) line: Option<usize>,
-    pub(crate) description: String,
-    /// Timestamp of the plan the item was last carried from.
-    pub(crate) origin_ts: String,
-    /// How many times this item has been carried over (1 on first carry).
-    pub(crate) attempt: u32,
+/// Convert a parsed finding into a plan item.
+fn finding_to_item(f: &Finding) -> PlanItem {
+    PlanItem {
+        role: f.role.clone(),
+        severity: f.severity.clone(),
+        title: f.title.clone(),
+        description: f.description.clone(),
+        file: f.file.clone(),
+        line: f.line,
+        carried_from: None,
+        attempt: 0,
+    }
 }
 
-/// Marker line rendered under each carried item; parsed back on the next run.
-const CARRIED_MARKER_PREFIX: &str = "**Carried over:** from ";
-/// Items carried this many times or more are flagged for human decision.
-const WONTFIX_ATTEMPT_THRESHOLD: u32 = 3;
-
-/// Parse the "## 🟡 Defer to Next Phase" section of a previous plan into
-/// [`CarriedDefer`] items. Items that already carry a
-/// `**Carried over:** from <ts>, attempt N` marker get attempt = N + 1 and keep
-/// their original origin timestamp; fresh items get attempt = 1 with
+/// Parse the "## 🟡 Defer to Next Phase" section of a previous plan into items.
+/// Items that already carry a provenance marker keep their original origin
+/// timestamp and incremented attempt; fresh items get attempt = 1 with
 /// `now_ts` as their origin. Returns an empty vec when there is no defer
 /// section.
-pub(crate) fn parse_carry_over(prev_plan: &str, now_ts: &str) -> Vec<CarriedDefer> {
+pub(crate) fn parse_carry_over(prev_plan: &str, now_ts: &str) -> Vec<PlanItem> {
+    let section = markdown::extract_section(prev_plan, "Defer to Next Phase");
+    if section.is_empty() {
+        return Vec::new();
+    }
+
     let mut items = Vec::new();
-    let Some(section) = extract_defer_section(prev_plan) else {
-        return items;
-    };
-
-    let marker_re = regex::Regex::new(r"\*\*Carried over:\*\* from (.+), attempt (\d+)").ok();
-
-    for block in split_defer_blocks(section) {
-        let mut title = String::new();
-        let mut role = "Unknown".to_string();
-        let mut severity = "UNKNOWN".to_string();
-        let mut file = None;
-        let mut line_no = None;
-        let mut description = String::new();
-        let mut in_description = false;
-        let mut origin_ts = now_ts.to_string();
-        let mut attempt: u32 = 1;
-
-        for raw in block.lines() {
-            let line = raw.trim_end();
-            if let Some(rest) = line.strip_prefix("### ") {
-                // "Deferred N: <title>" or "Carried N: <title>"
-                if let Some((_, t)) = rest.split_once(": ") {
-                    title = t.trim().to_string();
-                }
-                in_description = false;
-            } else if let Some(rest) = line.strip_prefix("**Source:** ") {
-                role = rest
-                    .strip_suffix(" Reviewer")
-                    .unwrap_or(rest)
-                    .trim()
-                    .to_string();
-                in_description = false;
-            } else if let Some(rest) = line.strip_prefix("**Severity:** ") {
-                severity = rest.trim().to_string();
-                in_description = false;
-            } else if let Some(rest) = line.strip_prefix("**File:** ") {
-                file = Some(rest.trim_matches('`').to_string());
-                in_description = false;
-            } else if let Some(rest) = line.strip_prefix("**Line:** ") {
-                line_no = rest.trim().parse::<usize>().ok();
-                in_description = false;
-            } else if line == "**Description:**" || line.starts_with("**Description:**") {
-                description = line
-                    .strip_prefix("**Description:**")
-                    .unwrap_or("")
-                    .trim()
-                    .to_string();
-                in_description = true;
-            } else if line.starts_with(CARRIED_MARKER_PREFIX) {
-                if let Some(caps) = marker_re.as_ref().and_then(|re| re.captures(line)) {
-                    origin_ts = caps[1].to_string();
-                    attempt = caps[2].parse::<u32>().unwrap_or(1).saturating_add(1);
-                }
-                in_description = false;
-            } else if in_description && !line.is_empty() && !line.starts_with('#') {
-                if !description.is_empty() {
-                    description.push(' ');
-                }
-                description.push_str(line);
-            }
+    for mut item in plan::parse_items(&section) {
+        if item.carried_from.is_none() {
+            // Fresh item deferred this run: provenance starts now, attempt 1.
+            item.carried_from = Some(now_ts.to_string());
+            item.attempt = 1;
+        } else {
+            // Already carried before: increment once per generation (the
+            // marker records the attempt at last render).
+            item.attempt = item.attempt.saturating_add(1);
         }
-
-        if title.is_empty() {
-            continue;
-        }
-        items.push(CarriedDefer {
-            title,
-            role,
-            severity,
-            file,
-            line: line_no,
-            description,
-            origin_ts,
-            attempt,
-        });
+        items.push(item);
     }
     items
 }
 
-/// Return the text of the defer section (header excluded, next `## ` header or
-/// EOF terminating it), or None when absent.
-fn extract_defer_section(plan: &str) -> Option<&str> {
-    let start = plan.find("## 🟡 Defer to Next Phase")?;
-    let body = &plan[start..];
-    let after_header = match body.find('\n') {
-        Some(idx) => &body[idx + 1..],
-        None => "",
-    };
-    let end = after_header
-        .find("\n## ")
-        .map(|idx| idx + 1)
-        .unwrap_or(after_header.len());
-    Some(&after_header[..end])
-}
-
-/// Split a defer section into per-item blocks at `### ` headings.
-fn split_defer_blocks(section: &str) -> Vec<&str> {
-    let mut starts: Vec<usize> = Vec::new();
-    let mut offset = 0usize;
-    for l in section.split_inclusive('\n') {
-        if l.starts_with("### ") {
-            starts.push(offset);
-        }
-        offset += l.len();
-    }
-    if starts.is_empty() {
-        return Vec::new();
-    }
-    starts.push(section.len());
-    starts
-        .windows(2)
-        .map(|w| section[w[0]..w[1]].trim_end())
-        .collect()
-}
-
-/// Extract the previous plan's own generation timestamp from its
-/// `> Generated: <ts>` line, if present.
-fn extract_plan_timestamp(plan: &str) -> Option<String> {
-    plan.lines().find_map(|l| {
-        l.trim()
-            .strip_prefix("> Generated: ")
-            .map(|ts| ts.trim().to_string())
-    })
-}
-
 /// Read and parse the previous plan at `path` for carry-over. Any problem
 /// (missing file, unreadable, no defer section) is logged as a warning and
-/// yields no carried items — never a hard failure.
-pub(crate) fn read_carry_over(path: &Path, now_ts: &str) -> Vec<CarriedDefer> {
+/// yields no carried items — never a hard failure. Fresh items are stamped
+/// with the PREVIOUS plan's generation timestamp so provenance points at the
+/// run that deferred them.
+pub(crate) fn read_carry_over(path: &Path, now_ts: &str) -> Vec<PlanItem> {
     match fs::read_to_string(path) {
         Ok(content) => {
-            // Fresh items are stamped with the PREVIOUS plan's generation
-            // timestamp so provenance points at the run that deferred them.
-            let default_ts = extract_plan_timestamp(&content).unwrap_or_else(|| now_ts.to_string());
+            let default_ts = content
+                .lines()
+                .find_map(|l| l.trim().strip_prefix("> Generated: "))
+                .map(|ts| ts.trim().to_string())
+                .unwrap_or_else(|| now_ts.to_string());
             let items = parse_carry_over(&content, &default_ts);
             if items.is_empty() {
                 auto_dev_pipeline::log::log(&format!(
@@ -250,20 +148,7 @@ pub(crate) fn generate_plan(
         lines.push("## 🔴 Do Now (Quick Wins)".to_string());
         lines.push(String::new());
         for (i, finding) in do_now.iter().enumerate() {
-            lines.push(format!("### Fix {}: {}", i + 1, finding.title));
-            lines.push(format!("\n**Source:** {} Reviewer", finding.role));
-            lines.push(format!("**Severity:** {}", finding.severity));
-            if let Some(ref file) = finding.file {
-                lines.push(format!("**File:** `{}`", file));
-            }
-            if let Some(line) = finding.line {
-                lines.push(format!("**Line:** {}", line));
-            }
-            lines.push("\n**Description:**".to_string());
-            lines.push(finding.description.clone());
-            lines.push(String::new());
-            lines.push("**Action:** _To be filled by implementer_".to_string());
-            lines.push(String::new());
+            plan::render_item(&mut lines, i + 1, "Fix", &finding_to_item(finding), true);
         }
     }
 
@@ -288,7 +173,7 @@ pub(crate) fn generate_plan(
             if !items.is_empty() {
                 let latest = items
                     .iter()
-                    .map(|i| i.origin_ts.clone())
+                    .filter_map(|i| i.carried_from.clone())
                     .max()
                     .unwrap_or_default();
                 auto_dev_pipeline::log::log(&format!(
@@ -309,15 +194,13 @@ pub(crate) fn generate_plan(
         }
 
         for (i, finding) in defer.iter().enumerate() {
-            lines.push(format!("### Deferred {}: {}", i + 1, finding.title));
-            lines.push(format!("\n**Source:** {} Reviewer", finding.role));
-            lines.push(format!("**Severity:** {}", finding.severity));
-            if let Some(ref file) = finding.file {
-                lines.push(format!("**File:** `{}`", file));
-            }
-            lines.push("\n**Description:**".to_string());
-            lines.push(finding.description.clone());
-            lines.push(String::new());
+            plan::render_item(
+                &mut lines,
+                i + 1,
+                "Deferred",
+                &finding_to_item(finding),
+                false,
+            );
         }
     }
 
@@ -327,33 +210,14 @@ pub(crate) fn generate_plan(
 }
 
 /// Render one carried-over deferred item inside the Defer section.
-fn render_carried_item(lines: &mut Vec<String>, index: usize, item: &CarriedDefer) {
-    let mut title = format!("### Carried {}: {}", index, item.title);
-    if item.attempt >= WONTFIX_ATTEMPT_THRESHOLD {
-        title.push_str(" ⚠️ WONTFIX candidate — requires human decision");
-    }
-    lines.push(title);
-    lines.push(format!("\n**Source:** {} Reviewer", item.role));
-    lines.push(format!("**Severity:** {}", item.severity));
-    if let Some(ref file) = item.file {
-        lines.push(format!("**File:** `{}`", file));
-    }
-    if let Some(line) = item.line {
-        lines.push(format!("**Line:** {}", line));
-    }
-    lines.push("\n**Description:**".to_string());
-    lines.push(item.description.clone());
-    lines.push(String::new());
-    lines.push(format!(
-        "{}{}, attempt {}",
-        CARRIED_MARKER_PREFIX, item.origin_ts, item.attempt
-    ));
-    lines.push(String::new());
+fn render_carried_item(lines: &mut Vec<String>, index: usize, item: &PlanItem) {
+    plan::render_item(lines, index, "Carried", item, false);
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use auto_dev_pipeline::plan::WONTFIX_ATTEMPT_THRESHOLD;
 
     const SAMPLE_PLAN: &str = r#"# Auto-Dev Fix Plan
 
@@ -405,8 +269,11 @@ Expose pipeline metrics.
             items[0].description,
             "The module layout needs a cross-module redesign."
         );
-        // Fresh items get the current run timestamp and attempt 1.
-        assert_eq!(items[0].origin_ts, "2026-08-24T00:00:00");
+        // Fresh items get the previous plan's timestamp and attempt 1.
+        assert_eq!(
+            items[0].carried_from.as_deref(),
+            Some("2026-08-24T00:00:00")
+        );
         assert_eq!(items[0].attempt, 1);
     }
 
@@ -417,32 +284,32 @@ Expose pipeline metrics.
 
     #[test]
     fn attempt_increments_on_recarry() {
-        let plan_with_marker = "## 🟡 Defer to Next Phase\n\n### Deferred 1: Old issue\n\n**Source:** Code Reviewer\n**Severity:** MINOR\n\n**Description:**\nSomething deferred.\n\n**Carried over:** from 2026-01-01T09:00:00, attempt 2\n";
+        let plan_with_marker = "## 🟡 Defer to Next Phase\n\n### Carried 1: Old issue\n\n**Source:** Code Reviewer\n**Severity:** MINOR\n\n**Description:**\nSomething deferred.\n\n**Carried over:** from 2026-01-01T09:00:00, attempt 2\n";
         let items = parse_carry_over(plan_with_marker, "2026-08-24T00:00:00");
         assert_eq!(items.len(), 1);
         assert_eq!(items[0].attempt, 3);
-        assert_eq!(items[0].origin_ts, "2026-01-01T09:00:00");
+        assert_eq!(
+            items[0].carried_from.as_deref(),
+            Some("2026-01-01T09:00:00")
+        );
     }
 
     #[test]
     fn wontfix_marked_at_threshold() {
-        let item = CarriedDefer {
-            title: "Old".into(),
-            role: "Code".into(),
-            severity: "MINOR".into(),
-            file: None,
-            line: None,
-            description: "d".into(),
-            origin_ts: "2026-01-01T09:00:00".into(),
-            attempt: 3,
-        };
+        let mut item = PlanItem::new("Old");
+        item.role = "Code".into();
+        item.severity = "MINOR".into();
+        item.description = "d".into();
+        item.carried_from = Some("2026-01-01T09:00:00".into());
+        item.attempt = WONTFIX_ATTEMPT_THRESHOLD;
         let mut lines = Vec::new();
         render_carried_item(&mut lines, 1, &item);
         let text = lines.join("\n");
         assert!(text.contains("WONTFIX candidate"));
         assert!(text.contains("attempt 3"));
 
-        let fresh = CarriedDefer { attempt: 1, ..item };
+        let mut fresh = item.clone();
+        fresh.attempt = 1;
         let mut lines = Vec::new();
         render_carried_item(&mut lines, 1, &fresh);
         assert!(!lines.join("\n").contains("WONTFIX candidate"));
