@@ -3,6 +3,14 @@
 ## [Unreleased]
 
 ### Added
+- Release phase is now a real release tool: pre-flight checks before any side
+  effect (clean working tree, branch `main`, HEAD's GitHub Actions CI success,
+  Cargo.toml version == tag), a changelog gate (a curated `## [X.Y.Z]` section
+  must exist in CHANGELOG.md and becomes the GitHub Release body instead of
+  the "Auto-generated release" stub), and hermetic HTTP tests via the new
+  `github::HttpClient` trait (`ReqwestHttpClient` in production, mock in
+  tests) — the happy path build→tag→push→release is now covered without
+  network access.
 - `run-pipeline --phase execute`: resume/re-run only the execute phase against
   an existing review timestamp directory (pin the run with
   `AUTO_DEV_TIMESTAMP`); fails fast with an actionable message when no plan
