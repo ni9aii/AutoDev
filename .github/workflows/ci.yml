@@ -102,7 +102,7 @@ jobs:
             echo "Run 'bash tools/gen.sh' locally and commit the result."
             exit 1
           fi
-          if ! git diff --exit-code -- README.md SKILL.core.md; then
+          if ! git diff --exit-code -- docs/project-structure.md SKILL.core.md; then
             echo "::error::Project-structure blocks drifted from the real tree."
             echo "Run 'bash tools/gen-structure.sh' locally and commit the result."
             exit 1
