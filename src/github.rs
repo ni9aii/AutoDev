@@ -123,6 +123,14 @@ pub fn get_workflow_runs(repo: &str, token: Option<&str>) -> Result<Value> {
     ReqwestHttpClient.get_json(url.as_str(), token)
 }
 
+/// GET /repos/{repo}/actions/runs?head_sha=<sha> — runs for one commit, so a
+/// stale red run from an earlier commit on the same branch cannot mask a
+/// green HEAD (ci-check verdict).
+pub fn get_workflow_runs_for_sha(repo: &str, sha: &str, token: Option<&str>) -> Result<Value> {
+    let url = api_url(repo, &format!("actions/runs?head_sha={sha}&per_page=15"))?;
+    ReqwestHttpClient.get_json(url.as_str(), token)
+}
+
 /// Is GitHub Actions green for `sha`?
 ///
 /// Fetches workflow runs for the HEAD SHA and requires at least one run with
