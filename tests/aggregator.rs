@@ -79,6 +79,72 @@ fn integration_review_aggregator_produces_plan() {
     );
 }
 
+/// JSON sidecar (architecture plan Task 2): alongside `<ts>-plan.md` the
+/// aggregator must write `<ts>-plan.json`, a machine-readable mirror whose
+/// items match what the markdown parser extracts from the md plan.
+#[test]
+fn integration_review_aggregator_writes_json_sidecar_matching_markdown() {
+    let td = TempDir::new("aggregator-sidecar");
+    let project = "sidecarproj";
+    let timestamp = "20260101_000000";
+    let reviews_dir = td.path.join(project).join("reviews").join(timestamp);
+    fs::create_dir_all(&reviews_dir).unwrap();
+    fs::write(reviews_dir.join("code-review.md"), FAKE_REVIEW).unwrap();
+
+    let status = Command::new(env!("CARGO_BIN_EXE_review-aggregator"))
+        .args([
+            "--dev-notes",
+            "--dev-notes-root",
+            td.path.to_str().unwrap(),
+            "--project",
+            project,
+        ])
+        .status()
+        .expect("spawn review-aggregator");
+    assert!(status.success(), "review-aggregator exited non-zero");
+
+    let plans_dir = td.path.join(project).join("plans");
+    let sidecar_path = plans_dir.join(format!("{}-plan.json", timestamp));
+    assert!(
+        sidecar_path.exists(),
+        "JSON sidecar not created at {:?}",
+        sidecar_path
+    );
+
+    let sidecar_text = fs::read_to_string(&sidecar_path).unwrap();
+    let plan_doc: serde_json::Value =
+        serde_json::from_str(&sidecar_text).expect("sidecar is not valid JSON");
+
+    // Structure: generated + items array.
+    assert!(plan_doc["generated"].is_string(), "missing generated ts");
+    let items = plan_doc["items"].as_array().expect("items is not an array");
+    assert!(
+        !items.is_empty(),
+        "sidecar has no items despite FAKE_REVIEW"
+    );
+
+    // Item shape and content agreement with the markdown.
+    for item in items {
+        assert!(
+            !item["title"].as_str().unwrap_or("").is_empty(),
+            "empty title"
+        );
+        assert!(item["severity"].is_string(), "severity missing");
+    }
+    let titles: Vec<&str> = items.iter().filter_map(|i| i["title"].as_str()).collect();
+    assert!(
+        titles.iter().any(|t| t.contains("SQL injection")),
+        "sidecar missing the aggregated finding; got {:?}",
+        titles
+    );
+
+    // Every item title in the JSON appears in the markdown plan too.
+    let md = fs::read_to_string(plans_dir.join(format!("{}-plan.md", timestamp))).unwrap();
+    for t in &titles {
+        assert!(md.contains(t), "sidecar title {t:?} absent from markdown");
+    }
+}
+
 /// Run `review-aggregator` when there are no reviews: it should still succeed
 /// and create an empty/placeholder plan rather than panic.
 #[test]

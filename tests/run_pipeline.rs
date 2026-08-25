@@ -87,6 +87,13 @@ fn integration_run_pipeline_plan_end_to_end() {
     let mut plans: Vec<_> = fs::read_dir(&plans_dir)
         .unwrap()
         .filter_map(|e| e.ok())
+        // Only markdown plans; the aggregator also writes a JSON sidecar
+        // (<ts>-plan.json) which must not be picked up here.
+        .filter(|e| {
+            e.file_name()
+                .to_str()
+                .is_some_and(|n| n.ends_with("-plan.md"))
+        })
         .collect();
     plans.sort_by_key(|e| e.file_name());
     assert!(!plans.is_empty(), "no plan file written");

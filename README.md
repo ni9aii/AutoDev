@@ -166,7 +166,8 @@ $DEV_NOTES_ROOT/
     │       ├── architecture-review.md
     │       └── devops-review.md
     ├── plans/
-    │   └── YYYYMMDD_HHMMSS-plan.md
+    │   ├── YYYYMMDD_HHMMSS-plan.md
+    │   └── YYYYMMDD_HHMMSS-plan.json
     └── ci-reports/
         └── YYYYMMDD_HHMMSS-ci-status.md
 ```

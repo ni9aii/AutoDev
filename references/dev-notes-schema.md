@@ -136,6 +136,34 @@ review directories: `<timestamp>-plan.md` (e.g.
 extend an aggregator plan should use the same timestamp to preserve
 traceability back to the reviews that produced them.
 
+### Plan JSON sidecar
+
+Alongside every generated `<timestamp>-plan.md`, review-aggregator writes a
+machine-readable mirror `<timestamp>-plan.json`:
+
+```json
+{
+  "generated": "2026-08-25T12:00:00",
+  "items": [
+    {
+      "role": "code",
+      "severity": "CRITICAL",
+      "title": "SQL injection in query builder",
+      "description": "...",
+      "file": "src/db.rs",
+      "line": 42,
+      "carried_from": null,
+      "attempt": 0
+    }
+  ]
+}
+```
+
+Consumers (execute, carry-over, external tooling) should prefer the sidecar;
+the markdown plan remains the human-readable artifact. `carried_from` is the
+origin-plan timestamp for items carried over from a previous plan, and
+`attempt` counts how many generations an item has been carried.
+
 ## CI report format
 
 `ci-check` writes a markdown report under `ci-reports/<timestamp>-ci-status.md`

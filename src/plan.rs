@@ -12,6 +12,7 @@
 
 use once_cell::sync::Lazy;
 use regex::Regex;
+use serde::{Deserialize, Serialize};
 
 /// Marker rendered under each carried item; parsed back on the next run.
 const CARRIED_MARKER_PREFIX: &str = "**Carried over:** from ";
@@ -27,19 +28,29 @@ const WONTFIX_SUFFIX: &str = " ⚠️ WONTFIX candidate — requires human decis
 /// One actionable item of a fix plan (a "Fix N", "Deferred N" or "Carried N"
 /// entry). Carry provenance is folded into the same type: fresh items have
 /// `carried_from == None` / `attempt == 0`.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct PlanItem {
     pub role: String,
     pub severity: String,
     pub title: String,
     pub description: String,
     pub file: Option<String>,
+    #[serde(default)]
     pub line: Option<usize>,
-    /// Origin-plan timestamp when this item was carried over from a previous
-    /// plan; None for items generated from the current run's findings.
+    #[serde(default)]
     pub carried_from: Option<String>,
-    /// How many times this item has been carried over (0 = fresh).
+    #[serde(default)]
     pub attempt: u32,
+}
+
+/// Machine-readable plan document — the JSON sidecar written next to
+/// `<ts>-plan.md`. Consumers (execute, carry-over) prefer it over parsing the
+/// markdown; the markdown remains the human artifact.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct Plan {
+    /// Plan generation timestamp (`> Generated:` / filename `<ts>`).
+    pub generated: String,
+    pub items: Vec<PlanItem>,
 }
 
 impl PlanItem {
