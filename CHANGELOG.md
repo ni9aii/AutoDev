@@ -1,5 +1,36 @@
 # Changelog
 
+## [0.8.0] - 2026-08-25
+
+### Added
+- Typed plan model `auto_dev_pipeline::plan::PlanItem` with a single renderer
+  and parser shared by review-aggregator and the execute phase; roundtrip
+  render→parse tests are the invariant (#47).
+- Machine-readable plan sidecar `<timestamp>-plan.json` written next to every
+  generated `<timestamp>-plan.md`, including carry-over provenance
+  (`carried_from`, `attempt`) (#48).
+- Aggregate phase fails fast with an actionable message when no
+  `*-review.md` reports exist (hermes-mode review instructions were not
+  executed) instead of silently producing an empty plan; adds the
+  `AUTO_DEV_TIMESTAMP` env override for deterministic runs (#46).
+
+### Changed
+- **BREAKING**: removed the legacy Claude CLI orchestration mode
+  (`--legacy-claude` flag, `execute_via_claude`, pre-flight auth check). The
+  pipeline is now exclusively agent-orchestrated via delegate_task; the
+  review phase always targets the deterministic dev-notes review directory
+  `<root>/<project>/reviews/<timestamp>/` (#49).
+- `Finding::classification` is now an enum (`do_now`/`defer` strings kept in
+  the plan sidecar for compatibility) (#50).
+
+### Fixed
+- `extract_section` terminated a section at any heading depth, collapsing
+  real aggregator plans' "Do Now"/"Defer" sections to their header — the
+  execute phase found zero fixes on real plans. Sections now end only at
+  same-or-shallower headings (#47).
+- Serialized env-mutating GitHub token tests that raced under parallel test
+  execution, flaking the ubuntu CI job (#50).
+
 ## [0.7.1] - 2026-07-14
 
 ### Fixed
