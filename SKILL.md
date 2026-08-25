@@ -113,6 +113,7 @@ Binaries install to `target/release/`. `cargo install --path .` puts
 ├── lib.rs
 ├── log.rs
 ├── markdown.rs
+├── plan.rs
 ├── process.rs
 ├── severity.rs
 ├── test_runner.rs
