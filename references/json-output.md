@@ -31,7 +31,7 @@ run-pipeline /path/to/project review --json 2>/dev/null
 | `version` | string | AutoDev package version (`CARGO_PKG_VERSION`). |
 | `project` | string | Absolute or relative path to the target project. |
 | `phase` | string | One of `review`, `plan`, `full`, `release`. |
-| `mode` | string | `"hermes"` or `"legacy"`. |
+| `mode` | string | Always `"hermes"` (agent-orchestrated; kept for backward compatibility). |
 | `timestamp` | string | `YYYYMMDD_HHMMSS` of this run; also used in artifact paths. |
 | `output_dir` | string | Directory where this run's artifacts are written. |
 

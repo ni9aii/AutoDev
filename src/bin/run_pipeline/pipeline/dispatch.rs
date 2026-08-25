@@ -25,14 +25,7 @@ pub(crate) fn run(pipeline: &Pipeline) -> anyhow::Result<()> {
     ));
     log::log(&format!("Project: {}", pipeline.project_path.display()));
     log::log(&format!("Phase: {}", pipeline.phase));
-    log::log(&format!(
-        "Mode: {}",
-        if pipeline.hermes_mode {
-            "Hermes (delegate_task)"
-        } else {
-            "Legacy (Claude CLI)"
-        }
-    ));
+    log::log("Mode: agent-orchestrated (delegate_task)");
     log::log(&format!("Output: {}", pipeline.output_dir.display()));
 
     pipeline.check_prerequisites()?;
@@ -66,11 +59,7 @@ pub(crate) fn run(pipeline: &Pipeline) -> anyhow::Result<()> {
             version: env!("CARGO_PKG_VERSION"),
             project: pipeline.project_path.display().to_string(),
             phase: pipeline.phase.to_string(),
-            mode: if pipeline.hermes_mode {
-                "hermes"
-            } else {
-                "legacy"
-            },
+            mode: "hermes",
             timestamp: &pipeline.timestamp,
             output_dir: pipeline.output_dir.display().to_string(),
         };
