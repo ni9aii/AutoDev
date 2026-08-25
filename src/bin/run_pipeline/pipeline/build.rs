@@ -79,6 +79,25 @@ impl Pipeline {
 }
 
 #[cfg(test)]
+impl Pipeline {
+    /// Shared test fixture (Task 5): new Pipeline fields must only be added
+    /// here, not to every hand-rolled initializer.
+    pub(crate) fn test_default(runner: Box<dyn auto_dev_pipeline::process::ProcessRunner>) -> Self {
+        Pipeline {
+            project_path: std::path::PathBuf::from("."),
+            phase: crate::Phase::Full,
+            version: None,
+            project_name: None,
+            timestamp: "20260101_000000".to_string(),
+            output_dir: std::path::PathBuf::from("."),
+            dev_notes_root: std::path::PathBuf::from("."),
+            json: false,
+            runner,
+        }
+    }
+}
+
+#[cfg(test)]
 mod tests {
     use super::*;
 

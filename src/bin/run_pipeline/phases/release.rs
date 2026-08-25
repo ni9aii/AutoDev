@@ -95,20 +95,12 @@ impl Pipeline {
 #[cfg(test)]
 mod tests {
     use auto_dev_pipeline::process::{mock_output, MockRunner};
-    use std::path::PathBuf as StdPathBuf;
 
     fn pipeline_with(mock: MockRunner) -> crate::Pipeline {
-        crate::Pipeline {
-            project_path: StdPathBuf::from("."),
-            phase: crate::Phase::Release,
-            version: Some("v1.2.3".to_string()),
-            project_name: None,
-            timestamp: "20260101_000000".to_string(),
-            output_dir: StdPathBuf::from("."),
-            dev_notes_root: StdPathBuf::from("."),
-            json: false,
-            runner: Box::new(mock),
-        }
+        let mut p = crate::Pipeline::test_default(Box::new(mock));
+        p.phase = crate::Phase::Release;
+        p.version = Some("v1.2.3".to_string());
+        p
     }
 
     #[test]
