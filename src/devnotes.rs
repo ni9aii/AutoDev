@@ -50,7 +50,9 @@ mod tests {
 
     #[test]
     fn relative_root_stays_relative() {
+        // Compare as Paths, not strings: separators are platform-specific
+        // (backslash on Windows) and must not leak into assertions.
         let p = paths(Path::new("notes"), "x");
-        assert_eq!(p.reviews.to_string_lossy(), "notes/x/reviews");
+        assert_eq!(p.reviews, PathBuf::from("notes").join("x").join("reviews"));
     }
 }
