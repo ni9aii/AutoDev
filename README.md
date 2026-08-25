@@ -189,6 +189,7 @@ $DEV_NOTES_ROOT/
 ├── lib.rs
 ├── log.rs
 ├── markdown.rs
+├── plan.rs
 ├── process.rs
 ├── severity.rs
 ├── test_runner.rs

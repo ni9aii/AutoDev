@@ -16,4 +16,6 @@ pub mod severity;
 
 pub mod markdown;
 
+pub mod plan;
+
 pub mod github;
