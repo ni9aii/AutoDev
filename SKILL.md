@@ -272,7 +272,8 @@ $DEV_NOTES_ROOT/
     │       ├── architecture-review.md
     │       └── devops-review.md
     ├── plans/
-    │   └── YYYYMMDD_HHMMSS-plan.md     ← aggregator picks the LATEST reviews/<ts>/ dir
+    │   ├── YYYYMMDD_HHMMSS-plan.md     ← human-readable plan
+    │   └── YYYYMMDD_HHMMSS-plan.json   ← machine-readable sidecar (prefer for parsing)
     └── ci-reports/
         └── YYYYMMDD_HHMMSS-ci-status.md
 ```
