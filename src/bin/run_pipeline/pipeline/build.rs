@@ -49,6 +49,8 @@ impl Pipeline {
         // reproducing a specific run).
         let timestamp = std::env::var("AUTO_DEV_TIMESTAMP")
             .unwrap_or_else(|_| chrono::Local::now().format("%Y%m%d_%H%M%S").to_string());
+        auto_dev_pipeline::validation::validate_timestamp(&timestamp)
+            .map_err(|e| anyhow::anyhow!(e))?;
 
         // Validate project_path: must exist and not contain path traversal
         let project_path = std::fs::canonicalize(&args.project_path)

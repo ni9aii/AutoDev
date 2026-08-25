@@ -72,6 +72,23 @@ pub fn validate_project_name(name: &str) -> Result<(), String> {
     Ok(())
 }
 
+/// Validate the AUTO_DEV_TIMESTAMP pin value before it is joined onto paths.
+/// Must be exactly `YYYYMMDD_HHMMSS` (the format produced by
+/// `chrono::Local::now().format("%Y%m%d_%H%M%S")`): digits-only segments
+/// reject path separators, traversal components and arbitrary strings from
+/// the environment.
+pub fn validate_timestamp(ts: &str) -> Result<(), String> {
+    static TIMESTAMP_RE: Lazy<Regex> =
+        Lazy::new(|| Regex::new(r"^[0-9]{8}_[0-9]{6}$").expect("Invalid TIMESTAMP_RE pattern"));
+    if !TIMESTAMP_RE.is_match(ts) {
+        return Err(format!(
+            "Invalid AUTO_DEV_TIMESTAMP '{}': expected YYYYMMDD_HHMMSS (e.g. 20260825_232131)",
+            ts
+        ));
+    }
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -88,6 +105,22 @@ mod tests {
         assert!(validate_version("").is_err());
         assert!(validate_version("; rm -rf /").is_err());
         assert!(validate_version("$(whoami)").is_err());
+    }
+
+    #[test]
+    fn test_validate_timestamp() {
+        assert!(validate_timestamp("20260825_232131").is_ok());
+        assert!(validate_timestamp("19700101_000000").is_ok());
+
+        // Traversal, separators, arbitrary strings all rejected.
+        assert!(validate_timestamp("").is_err());
+        assert!(validate_timestamp("../../etc").is_err());
+        assert!(validate_timestamp("foo/bar").is_err());
+        assert!(validate_timestamp("2026-08-25 23:21:31").is_err());
+        assert!(validate_timestamp("20260825_23213").is_err()); // too short
+        assert!(validate_timestamp("202608252_32131").is_err()); // wrong split
+        assert!(validate_timestamp("20260825_232131 ").is_err()); // trailing space
+        assert!(validate_timestamp("2026082a_232131").is_err()); // non-digit
     }
 
     #[test]

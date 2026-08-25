@@ -16,7 +16,7 @@ impl CiChecker {
         let reports_dir = {
             auto_dev_pipeline::validation::validate_project_name(project)
                 .map_err(|e| anyhow::anyhow!(e))?;
-            root.join(project).join("ci-reports")
+            auto_dev_pipeline::devnotes::paths(root, project).ci_reports
         };
         fs::create_dir_all(&reports_dir)?;
 

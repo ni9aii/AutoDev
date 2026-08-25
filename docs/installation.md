@@ -14,6 +14,10 @@ curl -fsSL https://raw.githubusercontent.com/ni9aii/AutoDev/main/install.sh | ba
 
 `--remote` downloads the release tarball from GitHub, unpacks it to a temp
 directory and runs the bundled installer — full reuse of the local logic.
+If a `<tarball>.sha256` file is published alongside the release tarball, it
+is downloaded and verified with `sha256sum -c` before anything is unpacked;
+a mismatch aborts the install. If no checksum file exists, `--remote`
+prints a warning that the download was **not** verified and continues.
 
 ## From a checkout
 

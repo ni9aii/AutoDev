@@ -4,7 +4,7 @@ description: "AutoDev MVP: automated review → plan → execute → verify pipe
 version: 1.0.0
 author: ni9aii
 license: MIT
-platforms: [linux, windows, macos]
+platforms: [linux]
 metadata:
   hermes:
     tags: [AutoDev, Pipeline, Review, Code-Quality, CI, Automation, Rust]

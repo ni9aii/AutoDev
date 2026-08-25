@@ -63,7 +63,7 @@ fn main() -> Result<()> {
         let reviews_dir = {
             auto_dev_pipeline::validation::validate_project_name(project)
                 .map_err(|e| anyhow::anyhow!(e))?;
-            root.join(project).join("reviews")
+            auto_dev_pipeline::devnotes::paths(&root, project).reviews
         };
 
         // Find the most recent timestamp directory. A missing reviews/ dir
@@ -100,7 +100,7 @@ fn main() -> Result<()> {
                 (reviews_dir.clone(), "empty".to_string())
             }
         };
-        let plans_dir = root.join(project).join("plans");
+        let plans_dir = auto_dev_pipeline::devnotes::paths(&root, project).plans;
         fs::create_dir_all(&plans_dir)?;
         let output_path = plans_dir.join(format!("{}-plan.md", timestamp));
 

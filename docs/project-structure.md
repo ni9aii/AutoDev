@@ -4,6 +4,7 @@
 ```text
 .
 ├── bin_contract.rs
+├── devnotes.rs
 ├── git.rs
 ├── github.rs
 ├── lib.rs

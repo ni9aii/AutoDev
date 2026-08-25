@@ -23,11 +23,12 @@ impl Pipeline {
             })
             .unwrap_or_else(|| "unknown".to_string());
 
-        let review_dir = self
-            .dev_notes_root
-            .join(self.project_name.as_deref().unwrap_or("unknown"))
-            .join("reviews")
-            .join(&self.timestamp);
+        let review_dir = auto_dev_pipeline::devnotes::paths(
+            &self.dev_notes_root,
+            self.project_name.as_deref().unwrap_or("unknown"),
+        )
+        .reviews
+        .join(&self.timestamp);
         std::fs::create_dir_all(&review_dir)?;
 
         let reviewers = [

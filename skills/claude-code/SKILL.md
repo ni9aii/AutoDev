@@ -107,6 +107,7 @@ Binaries install to `target/release/`. `cargo install --path .` puts
 ```text
 .
 ├── bin_contract.rs
+├── devnotes.rs
 ├── git.rs
 ├── github.rs
 ├── lib.rs
@@ -167,8 +168,9 @@ Binaries install to `target/release/`. `cargo install --path .` puts
 
 ## CI
 
-GitHub Actions with an ubuntu + windows matrix:
-`cargo test` → `cargo clippy -- -D warnings` → `cargo build --release`.
+GitHub Actions builds/tests on an ubuntu + windows matrix
+(`cargo test` → `cargo clippy -- -D warnings` → `cargo build --release`);
+release binaries are published for Linux only.
 
 ## Phases
 
