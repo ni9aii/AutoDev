@@ -58,7 +58,10 @@ steps; the skill itself runs end to end with agent-native capabilities.
 
 All tasks execute via your agent's native tools:
 
-- Reviews: parallel subagents (4 reviewers)
+- Reviews: parallel subagents (4 reviewers) — **each reviewer MUST follow the
+  finding format in `references/dev-notes-schema.md`** (`### [SEVERITY]
+  Title` headers with `File:`/`Description:` fields); prose-style reports do
+  not parse and yield an empty plan
 - Simple fixes: read + edit
 - Complex fixes: subagents
 - Aggregation: `review-aggregator --dev-notes`
