@@ -68,7 +68,7 @@ jobs:
           cat "AutoDev-${TAG}-sha256.txt"
 
       - name: Attach release binaries
-        uses: softprops/action-gh-release@c12583777ecdfd3be55c69cf75464299dc01057e # v3
+        uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64 # v3
         with:
           files: |
             target/release/run-pipeline
