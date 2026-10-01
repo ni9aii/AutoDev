@@ -6,6 +6,8 @@
 | `DEV_NOTES_ROOT` | Root for dev-notes paths (default: `~/Notes/dev-notes`) |
 | `AUTODEV_INSTALL_ROOT` | Base dir for the installer (default: `$HOME`) |
 | `AUTO_DEV_TIMESTAMP` | Pin a run's timestamp to resume a single phase against an earlier run's artifacts |
+| `TYPESAFE_API_KEY` | Enables `review-aggregator --jev` (optional Jev AI classification). See [jev-classification.md](jev-classification.md) |
+| `JEV_BASE_URL` | Optional Jev endpoint override (e.g. `https://openrouter.ai/api` for the OpenRouter-hosted System One endpoint) |
 
 ## Release phase requirements
 

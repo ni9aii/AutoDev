@@ -84,6 +84,7 @@ Full documentation lives in [`docs/`](docs/):
 | [docs/installation.md](docs/installation.md) | Installer details: flags, manual install, update/uninstall |
 | [docs/dev-notes-layout.md](docs/dev-notes-layout.md) | Artifact tree, file formats, plan sidecar contract |
 | [docs/configuration.md](docs/configuration.md) | Env vars (`GITHUB_TOKEN`, `DEV_NOTES_ROOT`, …) |
+| [docs/jev-classification.md](docs/jev-classification.md) | Optional `--jev` AI classification for review findings (endpoints, env vars, guarantees) |
 | [docs/project-structure.md](docs/project-structure.md) | Repository layout (generated, drift-checked) |
 | [docs/development-by-cycles.md](docs/development-by-cycles.md) | How AutoDev develops itself, cycle by cycle |
 | [references/](references/) | Deep-dive notes: JSON output contract, troubleshooting, patterns |
