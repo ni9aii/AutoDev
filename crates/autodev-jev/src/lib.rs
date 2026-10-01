@@ -156,8 +156,12 @@ fn ask_batch(
         let question = choice(
             format!(
                 "Review finding: [{}] {}.{} {} Should this be fixed now (do_now) or deferred (defer)? \
-                 do_now = a concrete, low-risk fix for a real defect with a known location; \
-                 defer = a refactoring/architecture suggestion, speculative, or invasive. \
+                 do_now = a real defect that matters: ignoring it causes incorrect behavior, crashes, \\
+                 data loss or a security hole. \
+                 defer = cosmetic or trivial changes (typos, wording, naming) REGARDLESS of the stated \\
+                 severity, refactoring/architecture suggestions, speculative or invasive work. \\
+                 Severity labels in reviews are often miscalibrated - judge by the consequence \\
+                 described, not by the label. \
                  The heuristic previously classified it as {:?}; disagree when the description warrants it.",
                 f.severity,
                 f.title,
@@ -169,8 +173,8 @@ fn ask_batch(
                 }
             ),
             [
-                ("do_now", "concrete defect fix, do it now"),
-                ("defer", "refactoring/speculative/invasive, defer"),
+                ("do_now", "real defect that matters, fix now"),
+                ("defer", "cosmetic/trivial or invasive, defer"),
             ],
         );
         questions.add(format!("{CHOICE_ID}_{i}"), question);
