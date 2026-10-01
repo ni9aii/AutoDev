@@ -233,6 +233,34 @@ Carried items appear at the top of the Defer section with an attempt counter;
 items carried 3+ times are flagged "⚠️ WONTFIX candidate — requires human
 decision". A missing or unparseable file is skipped with a warning.
 
+#### Optional: Jev AI classification (`--jev`)
+
+Add `--jev` to re-classify all findings with Jev (TypeSafe System One) after
+the heuristic pass — one batch request per run, ~1 s:
+
+```bash
+review-aggregator \
+  --dev-notes \
+  --project <project-name> \
+  --dev-notes-root $DEV_NOTES_ROOT \
+  --jev
+```
+
+Guarantees (see `docs/jev-classification.md` for details):
+
+- Off by default; without the flag the output is identical to the
+  heuristic-only run.
+- Any Jev failure (no `TYPESAFE_API_KEY`, network error, low confidence
+  < 0.6) keeps the heuristic verdict and marks the item
+  `heuristic_fallback`. The pipeline never breaks because of Jev.
+- When the pass runs, each plan item records
+  `**Classified by:** jev | heuristic_fallback` in the markdown and a
+  `classification_source` field in the JSON sidecar. `do_now` stays the
+  only consumer-relevant flag.
+- Endpoint override: `JEV_BASE_URL=https://openrouter.ai/api` + an
+  OpenRouter key uses the OpenRouter-hosted System One endpoint
+  (model `jev-latest`, verified working).
+
 Result: a plan in `$DEV_NOTES_ROOT/<project>/plans/<timestamp>-plan.md` with
 "Do Now" and "Defer" sections.
 
