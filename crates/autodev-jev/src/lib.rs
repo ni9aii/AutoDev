@@ -78,11 +78,20 @@ impl AskJev for Client {
     }
 }
 
-/// Build a production client from the environment (`TYPESAFE_API_KEY`).
-/// Returns `Err` when the key is missing — callers should treat that as
-/// "run without --jev", not as a fatal error.
+/// Build a production client from the environment. `TYPESAFE_API_KEY` is
+/// required; `JEV_BASE_URL` (optional) overrides the API endpoint — set it
+/// to `https://openrouter.ai/api` to use the OpenRouter-hosted SystemOne
+/// endpoint with an OpenRouter key. Returns `Err` when the key is missing —
+/// callers should treat that as "run without --jev", not as a fatal error.
 pub fn client_from_env() -> Result<Arc<dyn AskJev>, String> {
-    let client = Client::new().map_err(|e| e.to_string())?;
+    let builder = Client::builder();
+    let client = match std::env::var("JEV_BASE_URL") {
+        Ok(url) if !url.is_empty() => builder
+            .configure(|b| b.base_url(url))
+            .build()
+            .map_err(|e| e.to_string())?,
+        _ => builder.build().map_err(|e| e.to_string())?,
+    };
     Ok(Arc::new(client))
 }
 
@@ -112,6 +121,16 @@ pub fn classify_with(client: &dyn AskJev, findings: &[FindingInput]) -> Vec<Clas
     }
 }
 
+fn truncate_desc(desc: &str, max: usize) -> String {
+    let compact = desc.split_whitespace().collect::<Vec<_>>().join(" ");
+    if compact.chars().count() <= max {
+        compact
+    } else {
+        let cut: String = compact.chars().take(max).collect();
+        format!("{cut}...")
+    }
+}
+
 fn ask_batch(
     client: &dyn AskJev,
     findings: &[FindingInput],
@@ -120,17 +139,34 @@ fn ask_batch(
     let state = kunobi_jev::Entry::from_serialize(&findings)
         .map_err(|e| format!("could not serialize findings: {e}"))?;
 
-    // One Choice question per finding, all riding the same request:
-    // the state is sent once no matter how many questions ride along.
+    // One Choice question per finding, all riding the same request: the
+    // state is sent once no matter how many questions ride along. Each
+    // question is SELF-CONTAINED (finding data quoted in the text): asking
+    // the model to map "finding #N" to an array position in the state
+    // misaligns answers in multi-question requests (observed live:
+    // answers returned for the wrong findings). The heuristic_hint stays
+    // in the question so Jev can disagree with it explicitly.
     let mut questions = Questions::new();
-    for (i, _) in findings.iter().enumerate() {
+    for (i, f) in findings.iter().enumerate() {
+        let file_part = f
+            .file
+            .as_deref()
+            .map(|f| format!(" File: {f}."))
+            .unwrap_or_default();
         let question = choice(
             format!(
-                "triage_{i}: should review finding #{i} be fixed now (do_now) or deferred (defer)? \
-                 A finding is do_now when it is a concrete, low-risk fix for a real defect with a \
-                 known location. Defer when it is a refactoring/architecture suggestion, speculative, \
-                 or the fix would be invasive. The heuristic_hint in the state is a weak prior; \
-                 disagree when the description contradicts it."
+                "Review finding: [{}] {}.{} {} Should this be fixed now (do_now) or deferred (defer)? \
+                 do_now = a concrete, low-risk fix for a real defect with a known location; \
+                 defer = a refactoring/architecture suggestion, speculative, or invasive. \
+                 The heuristic previously classified it as {:?}; disagree when the description warrants it.",
+                f.severity,
+                f.title,
+                file_part,
+                truncate_desc(&f.description, 300),
+                match f.heuristic_hint {
+                    Verdict::DoNow => "do_now",
+                    Verdict::Defer => "defer",
+                }
             ),
             [
                 ("do_now", "concrete defect fix, do it now"),
