@@ -125,6 +125,7 @@ Binaries install to `target/release/`. `cargo install --path .` puts
 │   │   ├── report.rs
 │   ├── review_aggregator/
 │   │   ├── findings.rs
+│   │   ├── jev.rs
 │   │   ├── main.rs
 │   │   ├── parse.rs
 │   │   ├── plan.rs
@@ -139,6 +140,7 @@ Binaries install to `target/release/`. `cargo install --path .` puts
 ├── gen.sh
 ├── workflows/
 │   ├── ci.yml
+│   ├── jev-smoke.yml
 │   ├── release.yml
 ├── claude-code/
 │   ├── SKILL.md

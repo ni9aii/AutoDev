@@ -175,6 +175,7 @@ pub(crate) fn parse_review_file(filepath: &Path) -> Result<Vec<Finding>> {
             file,
             line,
             classification,
+            source: super::findings::ClassificationSource::Heuristic,
         });
     }
 
