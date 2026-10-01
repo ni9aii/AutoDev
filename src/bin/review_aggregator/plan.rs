@@ -11,7 +11,7 @@ use std::path::Path;
 use auto_dev_pipeline::markdown;
 use auto_dev_pipeline::plan::{self, PlanItem};
 
-use super::findings::{prioritize_findings, Classification, Finding};
+use super::findings::{prioritize_findings, Classification, ClassificationSource, Finding};
 
 /// Convert a parsed finding into a plan item.
 fn finding_to_item(f: &Finding) -> PlanItem {
@@ -25,6 +25,11 @@ fn finding_to_item(f: &Finding) -> PlanItem {
         carried_from: None,
         attempt: 0,
         do_now: f.classification == Classification::DoNow,
+        classification_source: match f.source {
+            ClassificationSource::Heuristic => None, // default, keep sidecars lean
+            ClassificationSource::Jev => Some("jev".to_string()),
+            ClassificationSource::HeuristicFallback => Some("heuristic_fallback".to_string()),
+        },
     }
 }
 
@@ -88,10 +93,27 @@ pub(crate) fn read_carry_over(path: &Path, now_ts: &str) -> Vec<PlanItem> {
     }
 }
 
+/// Heuristic-only plan generation — the no-Jev reference path, kept for
+/// callers that never need provenance; production main() always calls
+/// [`generate_plan_with_provenance`].
+#[allow(dead_code)]
 pub(crate) fn generate_plan(
     findings: &[Finding],
     output_path: &Path,
     carry_over_from: Option<&Path>,
+) -> Result<()> {
+    generate_plan_with_provenance(findings, output_path, carry_over_from, false)
+}
+
+/// `with_provenance` renders the `**Classified by:**` line in the markdown
+/// and enables the classification_source field in the JSON sidecar. When
+/// false (no --jev), both are omitted entirely so heuristic-only plans are
+/// byte-identical to pre-Jev output.
+pub(crate) fn generate_plan_with_provenance(
+    findings: &[Finding],
+    output_path: &Path,
+    carry_over_from: Option<&Path>,
+    with_provenance: bool,
 ) -> Result<()> {
     let prioritized = prioritize_findings(findings);
     let mut lines: Vec<String> = Vec::new();
@@ -150,6 +172,9 @@ pub(crate) fn generate_plan(
         lines.push(String::new());
         for (i, finding) in do_now.iter().enumerate() {
             plan::render_item(&mut lines, i + 1, "Fix", &finding_to_item(finding), true);
+            if with_provenance {
+                render_classified_by(&mut lines, finding.source);
+            }
         }
     }
 
@@ -202,6 +227,9 @@ pub(crate) fn generate_plan(
                 &finding_to_item(finding),
                 false,
             );
+            if with_provenance {
+                render_classified_by(&mut lines, finding.source);
+            }
         }
     }
 
@@ -244,6 +272,20 @@ pub(crate) fn generate_plan(
 /// Render one carried-over deferred item inside the Defer section.
 fn render_carried_item(lines: &mut Vec<String>, index: usize, item: &PlanItem) {
     plan::render_item(lines, index, "Carried", item, false);
+}
+
+/// Append the `**Classified by:**` provenance line after a rendered item.
+/// Only called under --jev; heuristic-only plans must not change.
+fn render_classified_by(lines: &mut Vec<String>, source: ClassificationSource) {
+    let label = match source {
+        ClassificationSource::Heuristic => "heuristic",
+        ClassificationSource::Jev => "jev",
+        ClassificationSource::HeuristicFallback => {
+            "heuristic_fallback (Jev rejected, heuristic kept)"
+        }
+    };
+    lines.push(format!("**Classified by:** {label}"));
+    lines.push(String::new());
 }
 
 #[cfg(test)]
@@ -365,5 +407,91 @@ Expose pipeline metrics.
             assert_eq!(a.severity, b.severity);
             assert_eq!(b.attempt, a.attempt + 1);
         }
+    }
+
+    /// Regression guard for the --jev contract: with_provenance == false,
+    /// the generated plan must be byte-identical to the pre-Jev renderer.
+    #[test]
+    fn provenance_off_matches_heuristic_only_output() {
+        let mk = |provenance: bool| {
+            let findings = vec![
+                Finding {
+                    role: "code".into(),
+                    severity: "CRITICAL".into(),
+                    title: "SQL injection".into(),
+                    description: "bad query".into(),
+                    file: Some("src/db.rs".into()),
+                    line: Some(7),
+                    classification: Classification::DoNow,
+                    source: if provenance {
+                        ClassificationSource::Jev
+                    } else {
+                        ClassificationSource::Heuristic
+                    },
+                },
+                Finding {
+                    role: "architecture".into(),
+                    severity: "MINOR".into(),
+                    title: "Refactor module layout".into(),
+                    description: "cross-module redesign".into(),
+                    file: None,
+                    line: None,
+                    classification: Classification::Defer,
+                    source: if provenance {
+                        ClassificationSource::HeuristicFallback
+                    } else {
+                        ClassificationSource::Heuristic
+                    },
+                },
+            ];
+            let dir = std::env::temp_dir().join(format!(
+                "autodev-prov-{}-{}",
+                std::process::id(),
+                provenance as u8
+            ));
+            std::fs::create_dir_all(&dir).unwrap();
+            let out = dir.join("plan.md");
+            generate_plan_with_provenance(&findings, &out, None, provenance).unwrap();
+            let text = std::fs::read_to_string(&out).unwrap();
+            let _ = std::fs::remove_dir_all(&dir);
+            text
+        };
+        let without = mk(false);
+        let with = mk(true);
+        assert!(
+            !without.contains("Classified by"),
+            "heuristic plan must not carry provenance lines"
+        );
+        assert!(with.contains("**Classified by:** jev"));
+        assert!(with.contains("**Classified by:** heuristic_fallback"));
+    }
+
+    /// The JSON sidecar carries classification_source only under --jev;
+    /// old sidecars (field absent) must still deserialize.
+    #[test]
+    fn sidecar_classification_source_additive() {
+        // Old sidecar shape: no classification_source field.
+        let old = r#"{"generated":"t","items":[{"role":"code","severity":"CRITICAL","title":"x","description":"","file":null,"line":null,"carried_from":null,"attempt":0,"do_now":true,"classification_source":"jev"}]}"#;
+        let doc: auto_dev_pipeline::plan::Plan = serde_json::from_str(old).unwrap();
+        let item = &doc.items[0];
+        assert!(item.do_now);
+        assert_eq!(item.classification_source.as_deref(), Some("jev"));
+
+        // A sidecar WITHOUT the field (pre-Jev shape) still deserializes.
+        let pre_jev = r#"{"generated":"t","items":[{"role":"code","severity":"CRITICAL","title":"x","description":"","file":null,"line":null,"carried_from":null,"attempt":0,"do_now":true}]}"#;
+        let pre_doc: auto_dev_pipeline::plan::Plan = serde_json::from_str(pre_jev).unwrap();
+        let pre = &pre_doc.items[0];
+        assert!(pre.do_now);
+        assert_eq!(pre.classification_source, None);
+
+        // New sidecar shape round-trips.
+        let mut item2 = item.clone();
+        item2.classification_source = Some("jev".into());
+        let ser = serde_json::to_string(&item2).unwrap();
+        assert!(ser.contains("classification_source"));
+        // Heuristic-only items skip the field entirely.
+        let item3 = auto_dev_pipeline::plan::PlanItem::new("y");
+        let ser3 = serde_json::to_string(&item3).unwrap();
+        assert!(!ser3.contains("classification_source"));
     }
 }

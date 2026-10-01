@@ -49,6 +49,14 @@ pub struct PlanItem {
     /// field deserialize as `false`.
     #[serde(default)]
     pub do_now: bool,
+    /// Optional classification provenance, present only when the aggregator
+    /// ran with --jev: "jev" (Jev verdict accepted) or "heuristic_fallback"
+    /// (Jev consulted but rejected — low confidence / error — heuristic
+    /// verdict kept). Absent for heuristic-only plans, so older sidecars and
+    /// no-flag runs deserialize unchanged. Consumers keep reading `do_now`;
+    /// this field is informational.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub classification_source: Option<String>,
 }
 
 /// Machine-readable plan document — the JSON sidecar written next to
@@ -73,6 +81,7 @@ impl PlanItem {
             carried_from: None,
             attempt: 0,
             do_now: false,
+            classification_source: None,
         }
     }
 
