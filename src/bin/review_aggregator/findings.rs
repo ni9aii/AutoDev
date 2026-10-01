@@ -12,6 +12,21 @@ pub(crate) enum Classification {
     Defer,
 }
 
+/// Who produced the final classification. `Heuristic` when --jev is off;
+/// `Jev` when Jev's verdict was accepted; `HeuristicFallback` when Jev was
+/// consulted but its answer was rejected (low confidence, transport error,
+/// unknown answer type) and the heuristic verdict stood. Additive
+/// provenance only — consumers keep reading `do_now`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub(crate) enum ClassificationSource {
+    #[serde(rename = "heuristic")]
+    Heuristic,
+    #[serde(rename = "jev")]
+    Jev,
+    #[serde(rename = "heuristic_fallback")]
+    HeuristicFallback,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub(crate) struct Finding {
     pub(crate) role: String,
@@ -21,6 +36,7 @@ pub(crate) struct Finding {
     pub(crate) file: Option<String>,
     pub(crate) line: Option<usize>,
     pub(crate) classification: Classification,
+    pub(crate) source: ClassificationSource,
 }
 
 pub(crate) fn classify_finding(
@@ -88,6 +104,7 @@ mod tests {
             file: file.map(|f| f.to_string()),
             line: None,
             classification: Classification::DoNow,
+            source: ClassificationSource::Heuristic,
         }
     }
 

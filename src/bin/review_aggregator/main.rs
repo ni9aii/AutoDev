@@ -2,6 +2,7 @@
 //! Aggregates findings from reviewers and generates a prioritized fix plan.
 
 mod findings;
+mod jev;
 mod parse;
 mod plan;
 
@@ -14,7 +15,7 @@ use walkdir::WalkDir;
 
 use findings::dedup_findings;
 use parse::parse_review_file;
-use plan::generate_plan;
+use plan::generate_plan_with_provenance;
 
 /// Review Aggregator for Auto-Dev Pipeline
 /// Aggregates findings from reviewers and generates prioritized fix plan
@@ -47,6 +48,14 @@ struct Args {
     /// unparseable files are skipped with a warning, not an error.
     #[arg(long)]
     carry_over_from: Option<PathBuf>,
+
+    /// Re-classify findings with Jev (TypeSafe System One) after the
+    /// heuristic pass. Requires TYPESAFE_API_KEY; any Jev failure degrades
+    /// to the heuristic verdict (marked heuristic_fallback in the plan).
+    /// Off by default: without this flag the output is identical to the
+    /// heuristic-only run.
+    #[arg(long, default_value = "false")]
+    jev: bool,
 }
 
 fn main() -> Result<()> {
@@ -152,8 +161,34 @@ fn main() -> Result<()> {
         eprintln!("No findings found. Generating empty plan.");
     }
 
+    // Optional Jev re-classification (phase b): one batch request for the
+    // whole run, after dedup. Errors degrade to the heuristic verdict —
+    // the plan is still generated. Provenance lines appear only when the
+    // Jev pass actually ran: a failed client (no key) leaves the plan
+    // identical to a heuristic-only run.
+    let mut jev_ran = false;
+    if args.jev {
+        match jev::reclassify_with_jev(&mut all_findings) {
+            Ok(changed) => {
+                jev_ran = true;
+                eprintln!(
+                    "[auto-dev] Jev reclassified {} finding(s) vs heuristic",
+                    changed
+                );
+            }
+            Err(e) => {
+                eprintln!("[auto-dev] WARNING: {e}; using heuristic classifications");
+            }
+        }
+    }
+
     // Generate plan
-    generate_plan(&all_findings, &output_path, args.carry_over_from.as_deref())?;
+    generate_plan_with_provenance(
+        &all_findings,
+        &output_path,
+        args.carry_over_from.as_deref(),
+        jev_ran,
+    )?;
     println!("Plan generated: {}", output_path.display());
     println!("Total findings: {}", all_findings.len());
 

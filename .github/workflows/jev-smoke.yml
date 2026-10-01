@@ -1,0 +1,67 @@
+# Optional live-API smoke test for the Jev classification path.
+#
+# Runs ONLY on workflow_dispatch, never on push/PR: PR CI must not depend
+# on an external API. The job is skipped when TYPESAFE_API_KEY is not set
+# (actions secret absent) — the "skipped" outcome is normal, not a failure.
+name: Jev smoke
+
+on:
+  workflow_dispatch:
+
+# Least-privilege: the job only needs to read contents to check out.
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  jev-smoke:
+    name: Live Jev classification (one batch)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      TYPESAFE_API_KEY: ${{ secrets.TYPESAFE_API_KEY || secrets.OPENROUTER_API_KEY }}
+      JEV_BASE_URL: ${{ secrets.TYPESAFE_API_KEY && '' || 'https://openrouter.ai/api' }}
+    steps:
+      - name: Skip when the key is not configured
+        if: env.TYPESAFE_API_KEY == ''
+        run: echo "neither TYPESAFE_API_KEY nor OPENROUTER_API_KEY set — skipping live smoke test (expected on forks)."
+
+      - name: Checkout
+        if: env.TYPESAFE_API_KEY != ''
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Install Rust toolchain
+        if: env.TYPESAFE_API_KEY != ''
+        uses: dtolnay/rust-toolchain@4360b52568e2003a75bf9bc1d59f33a8e3fc893c # stable
+
+      - name: Run review-aggregator --jev on a fixture review
+        if: env.TYPESAFE_API_KEY != ''
+        run: |
+          set -eu
+          mkdir -p /tmp/jevsmoke
+          cat > /tmp/jevsmoke/code-review.md <<'EOF'
+          ### [CRITICAL] SQL injection in login query
+          User input is concatenated into the query string.
+          File: `src/db.rs`
+          Line: 42
+          EOF
+          cat > /tmp/jevsmoke/architecture-review.md <<'EOF'
+          ### [MINOR] Refactor module layout
+          The module layout needs a cross-module redesign.
+          EOF
+          cargo build -p auto-dev-pipeline
+          ./target/debug/review-aggregator --input-dir /tmp/jevsmoke \
+            --output /tmp/jevsmoke/plan.md --jev 2>&1 | tee /tmp/jevsmoke/stderr.log
+          test -f /tmp/jevsmoke/plan.md || { echo "::error::no plan produced"; exit 1; }
+          test -f /tmp/jevsmoke/plan.json || { echo "::error::no sidecar produced"; exit 1; }
+          # Every item must carry a classification_source when the pass ran.
+          python3 - <<'PY'
+          import json, sys
+          doc = json.load(open("/tmp/jevsmoke/plan.json"))
+          for item in doc["items"]:
+              if item.get("classification_source") not in ("jev", "heuristic_fallback"):
+                  sys.exit(f"::error::item {item['title']!r} has no Jev provenance: {item.get('classification_source')}")
+          print("All items carry Jev provenance:", [i["classification_source"] for i in doc["items"]])
+          PY
