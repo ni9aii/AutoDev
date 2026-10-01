@@ -77,7 +77,7 @@ update_block SKILL.core.md
 # Refresh the test counter in AGENTS.md (Task 4 of the retro plan): the count
 # between TEST-COUNT markers must match `cargo test -- --list`. CI fails on
 # drift via the same git diff gate as the structure blocks.
-TEST_COUNT="$(cargo test --locked -- --list 2>/dev/null | grep -c ': test')"
+TEST_COUNT="$(cargo test --workspace --locked -- --list 2>/dev/null | grep -c ': test')"
 if [ "$TEST_COUNT" -eq 0 ]; then
   echo "ERROR: could not count tests (cargo test --list returned nothing)" >&2
   exit 1
