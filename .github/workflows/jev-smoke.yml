@@ -21,11 +21,12 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     env:
-      TYPESAFE_API_KEY: ${{ secrets.TYPESAFE_API_KEY }}
+      TYPESAFE_API_KEY: ${{ secrets.TYPESAFE_API_KEY || secrets.OPENROUTER_API_KEY }}
+      JEV_BASE_URL: ${{ secrets.TYPESAFE_API_KEY && '' || 'https://openrouter.ai/api' }}
     steps:
       - name: Skip when the key is not configured
         if: env.TYPESAFE_API_KEY == ''
-        run: echo "TYPESAFE_API_KEY not set — skipping live smoke test (expected on forks)."
+        run: echo "neither TYPESAFE_API_KEY nor OPENROUTER_API_KEY set — skipping live smoke test (expected on forks)."
 
       - name: Checkout
         if: env.TYPESAFE_API_KEY != ''
