@@ -22,6 +22,7 @@
 │   │   ├── report.rs
 │   ├── review_aggregator/
 │   │   ├── findings.rs
+│   │   ├── jev.rs
 │   │   ├── main.rs
 │   │   ├── parse.rs
 │   │   ├── plan.rs
@@ -36,6 +37,7 @@
 ├── gen.sh
 ├── workflows/
 │   ├── ci.yml
+│   ├── jev-smoke.yml
 │   ├── release.yml
 ├── claude-code/
 │   ├── SKILL.md
