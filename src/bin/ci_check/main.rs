@@ -112,6 +112,12 @@ impl CiChecker {
         Self::overall_outcome(repo_known, ci_passed, local_passed)?;
 
         log::success("All checks complete!");
+        log::done(&format!(
+            "status=success ci={} local={} repo={}",
+            ci_passed,
+            local_passed,
+            repo.as_deref().unwrap_or("unknown")
+        ));
         Ok(())
     }
 
@@ -138,6 +144,7 @@ impl CiChecker {
 }
 
 fn main() -> Result<()> {
+    auto_dev_pipeline::log::auto_detect_no_color();
     let args = Args::parse();
     let checker = CiChecker::new(args.project_path.clone());
     checker.run(&args)?;

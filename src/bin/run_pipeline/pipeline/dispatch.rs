@@ -75,6 +75,14 @@ pub(crate) fn run(pipeline: &Pipeline) -> anyhow::Result<()> {
         log::success("Pipeline complete!");
         log::log(&format!("Reports: {}", pipeline.output_dir.display()));
     }
+    // DONE anchor goes to stderr in both modes: even a --json consumer keeps
+    // a single greppable summary line, and stderr stays the human log.
+    log::done(&format!(
+        "status=success phase={} project={} output={}",
+        pipeline.phase,
+        pipeline.project_path.display(),
+        pipeline.output_dir.display()
+    ));
 
     Ok(())
 }

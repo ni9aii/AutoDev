@@ -20,7 +20,7 @@ fn integration_review_aggregator_produces_plan() {
     fs::create_dir_all(&reviews_dir).unwrap();
     fs::write(reviews_dir.join("code-review.md"), FAKE_REVIEW).unwrap();
 
-    let status = Command::new(env!("CARGO_BIN_EXE_review-aggregator"))
+    let out = Command::new(env!("CARGO_BIN_EXE_review-aggregator"))
         .args([
             "--dev-notes",
             "--dev-notes-root",
@@ -28,10 +28,36 @@ fn integration_review_aggregator_produces_plan() {
             "--project",
             project,
         ])
-        .status()
+        .output()
         .expect("spawn review-aggregator");
 
-    assert!(status.success(), "review-aggregator exited non-zero");
+    assert!(
+        out.status.success(),
+        "review-aggregator exited non-zero\nstdout: {}\nstderr: {}",
+        String::from_utf8_lossy(&out.stdout),
+        String::from_utf8_lossy(&out.stderr)
+    );
+
+    // json-output contract: stdout stays clean for piping/parsing; all human
+    // log output (including the DONE summary anchor) goes to stderr.
+    let stdout = String::from_utf8_lossy(&out.stdout);
+    assert!(
+        stdout.trim().is_empty(),
+        "review-aggregator must not write to stdout, got: {stdout:?}"
+    );
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    let done_line = stderr
+        .lines()
+        .find(|l| l.contains("DONE"))
+        .expect("stderr must carry the DONE summary anchor");
+    assert!(
+        done_line.contains("findings=2") && done_line.contains("do_now="),
+        "DONE line must carry finding/do_now counts, got: {done_line:?}"
+    );
+    assert!(
+        done_line.contains("plan="),
+        "DONE line must carry the plan path, got: {done_line:?}"
+    );
 
     let plan_path = td
         .path

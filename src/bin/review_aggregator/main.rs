@@ -13,6 +13,7 @@ use std::fs;
 use std::path::PathBuf;
 use walkdir::WalkDir;
 
+use auto_dev_pipeline::log;
 use findings::dedup_findings;
 use parse::parse_review_file;
 use plan::generate_plan_with_provenance;
@@ -59,6 +60,7 @@ struct Args {
 }
 
 fn main() -> Result<()> {
+    auto_dev_pipeline::log::auto_detect_no_color();
     let args = Args::parse();
 
     // Resolve dev-notes paths if --dev-notes flag is set
@@ -102,10 +104,10 @@ fn main() -> Result<()> {
                 // Keep the empty-plan promise: no review directories under an
                 // existing reviews/ means a fresh project — emit the empty
                 // plan instead of erroring.
-                eprintln!(
-                    "[auto-dev] WARNING: No review directories found in {} — generating empty plan",
+                log::warn(&format!(
+                    "No review directories found in {} — generating empty plan",
                     reviews_dir.display()
-                );
+                ));
                 (reviews_dir.clone(), "empty".to_string())
             }
         };
@@ -113,9 +115,9 @@ fn main() -> Result<()> {
         fs::create_dir_all(&plans_dir)?;
         let output_path = plans_dir.join(format!("{}-plan.md", timestamp));
 
-        println!("[auto-dev] dev-notes mode enabled");
-        println!("[auto-dev] Input:  {}", input_dir.display());
-        println!("[auto-dev] Output: {}", output_path.display());
+        log::log("dev-notes mode enabled");
+        log::log(&format!("Input:  {}", input_dir.display()));
+        log::log(&format!("Output: {}", output_path.display()));
 
         (input_dir, output_path)
     } else {
@@ -142,11 +144,11 @@ fn main() -> Result<()> {
         .filter(|e| e.path().extension().is_some_and(|ext| ext == "md"))
     {
         let findings = parse_review_file(entry.path())?;
-        eprintln!(
+        log::log(&format!(
             "Parsed {} findings from {}",
             findings.len(),
             entry.path().display()
-        );
+        ));
         all_findings.extend(findings);
     }
 
@@ -154,11 +156,11 @@ fn main() -> Result<()> {
     all_findings = dedup_findings(all_findings);
     let deduped = before_dedup - all_findings.len();
     if deduped > 0 {
-        eprintln!("Removed {} duplicate finding(s)", deduped);
+        log::log(&format!("Removed {} duplicate finding(s)", deduped));
     }
 
     if all_findings.is_empty() {
-        eprintln!("No findings found. Generating empty plan.");
+        log::warn("No findings found. Generating empty plan.");
     }
 
     // Optional Jev re-classification (phase b): one batch request for the
@@ -171,13 +173,13 @@ fn main() -> Result<()> {
         match jev::reclassify_with_jev(&mut all_findings) {
             Ok(changed) => {
                 jev_ran = true;
-                eprintln!(
-                    "[auto-dev] Jev reclassified {} finding(s) vs heuristic",
+                log::log(&format!(
+                    "Jev reclassified {} finding(s) vs heuristic",
                     changed
-                );
+                ));
             }
             Err(e) => {
-                eprintln!("[auto-dev] WARNING: {e}; using heuristic classifications");
+                log::warn(&format!("{e}; using heuristic classifications"));
             }
         }
     }
@@ -189,19 +191,31 @@ fn main() -> Result<()> {
         args.carry_over_from.as_deref(),
         jev_ran,
     )?;
-    println!("Plan generated: {}", output_path.display());
-    println!("Total findings: {}", all_findings.len());
 
-    // Summary
-    let mut severity_counts: HashMap<String, usize> = HashMap::new();
-    for f in &all_findings {
-        *severity_counts.entry(f.severity.clone()).or_insert(0) += 1;
-    }
-
-    println!("\nSeverity breakdown:");
-    for sev in &["CRITICAL", "IMPORTANT", "MINOR"] {
-        println!("  {}: {}", sev, severity_counts.get(*sev).unwrap_or(&0));
-    }
+    // Human-readable summary lives entirely on stderr (json-output contract:
+    // stdout stays clean for piping/parsing). The trailing DONE line is the
+    // fixed anchor for both humans and wrapper agents.
+    let severity_counts: HashMap<String, usize> =
+        all_findings
+            .iter()
+            .fold(HashMap::new(), |mut acc: HashMap<String, usize>, f| {
+                *acc.entry(f.severity.clone()).or_insert(0) += 1;
+                acc
+            });
+    let do_now_count = all_findings
+        .iter()
+        .filter(|f| f.classification == findings::Classification::DoNow)
+        .count();
+    log::success(&format!("Plan generated: {}", output_path.display()));
+    log::done(&format!(
+        "findings={} do_now={} critical={} important={} minor={} plan={}",
+        all_findings.len(),
+        do_now_count,
+        severity_counts.get("CRITICAL").unwrap_or(&0),
+        severity_counts.get("IMPORTANT").unwrap_or(&0),
+        severity_counts.get("MINOR").unwrap_or(&0),
+        output_path.display()
+    ));
 
     Ok(())
 }
