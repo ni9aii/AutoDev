@@ -67,6 +67,7 @@ struct Args {
 }
 
 fn main() -> Result<()> {
+    auto_dev_pipeline::log::auto_detect_no_color();
     let args = Args::parse();
     let pipeline = Pipeline::new(args)?;
     crate::pipeline::dispatch::run(&pipeline)?;
