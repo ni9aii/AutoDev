@@ -805,10 +805,10 @@ dependencies = [
 ]
 
 [[package]]
-name = "kunobi-jev"
-version = "0.2.0"
+name = "kunobi-decision"
+version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d9321c26c689e982f7e15fb313962fd95a4524ab4bee9758c96e251ed0dcc1bb"
+checksum = "a1fd151277b29988d1a9288a47f188292ecd9352d1474fc7cb8fa51602f881dc"
 dependencies = [
  "bytes",
  "fastrand",
@@ -822,6 +822,15 @@ dependencies = [
  "tokio",
  "tracing",
  "zeroize",
+]
+
+[[package]]
+name = "kunobi-jev"
+version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "24697a372096ab9667b4c11ae084e0e709d9df63fcf70a829a6398663b240e3b"
+dependencies = [
+ "kunobi-decision",
 ]
 
 [[package]]
