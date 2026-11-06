@@ -70,7 +70,7 @@ jobs:
 
       - name: Install cargo-audit
         # Blocking: hard-fails CI on any known RUSTSEC advisory.
-        uses: taiki-e/install-action@83ac0ad63c0167e6f06796fab0fce28db1bf3db0 # v2
+        uses: taiki-e/install-action@3a3daafd3b7f23b8f65d9f5ba2db203fb59b79e2 # v2
         with:
           tool: cargo-audit
 
